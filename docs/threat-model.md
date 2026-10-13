@@ -9,7 +9,7 @@
 2. Prevent uploaded content from being executed or served as active content.
 3. Limit resource consumption during upload and image parsing.
 4. Protect database integrity and application secrets.
-5. Minimize retention of user images and metadata.
+5. Minimize retention of user images and metadata; require explicit opt-in for image retention and delete retained originals within 7 days.
 6. Avoid misleading users with unsupported AI-detection claims.
 7. Fail safely when a detector or database is unavailable.
 
@@ -42,14 +42,14 @@
 | T-06 | User values are inserted into SQL strings. | SQL injection or database corruption. | PDO prepared statements for all values; least-privilege DB account. | Test SQL metacharacters; verify they are handled as literal values. |
 | T-07 | Result page reflects untrusted text without escaping. | Cross-site scripting (XSS). | Escape output with htmlspecialchars using UTF-8; do not render metadata as HTML. | Test markup in filename/metadata; it must display as text. |
 | T-08 | Secrets are committed to Git or baked into the image. | Unauthorized access and data exposure. | Runtime configuration/secrets, .gitignore, no secrets in Docker build arguments. | Inspect repository, image configuration, and logs for secrets. |
-| T-09 | Images or metadata are retained longer than expected. | Privacy exposure and storage growth. | Process temporarily; delete in success and failure paths; define retention before adding history. | Verify cleanup after successful, rejected, and failed analyses. |
+| T-09 | Images or metadata are retained longer than expected, or saved without consent. | Privacy exposure, unauthorized access, and storage growth. | Retention is off by default; require explicit opt-in; store outside web root with restrictive permissions; set a 7-day expiry and automatic cleanup; clean up after failures too. | Verify no image remains without opt-in and opted-in images are deleted by expiry, including failed-analysis cases. |
 | T-10 | Detector is unavailable or times out. | Hung request or fabricated result. | Timeout, bounded retries if justified, clear inconclusive/unavailable status. | Simulate timeout; confirm no positive/negative claim is fabricated. |
 | T-11 | Absence of watermark/metadata is treated as proof of human authorship. | Misleading or harmful conclusions. | State limitations; distinguish “not detected” from “human-created”; evaluate classifiers before use. | Review result text for false certainty. |
 | T-12 | Logs capture request bodies, images, secrets, or raw metadata. | Sensitive data leakage. | Log event IDs, status, sanitized diagnostics only; restrict access and retention. | Inspect logs after valid and invalid upload tests. |
 
 ## 4. Risk priorities
 
-**High priority before public deployment:** T-01 validation, T-03 resource exhaustion, T-05 upload storage, T-06 SQL injection if database writes exist, T-08 secrets, T-09 privacy/cleanup.
+**High priority before public deployment:** T-01 validation, T-03 resource exhaustion, T-05 upload storage, T-06 SQL injection if database writes exist, T-08 secrets, T-09 consent, private storage, and automatic deletion.
 
 **Important before detector integration:** T-04 parser resilience, T-10 timeouts, T-11 honest interpretation, T-12 safe logging.
 
@@ -74,5 +74,19 @@ Risk levels are initial engineering judgments and should be updated after implem
 - [ ] Explain why extension and browser MIME are not enough.
 - [ ] Explain why file size and pixel dimensions both matter.
 - [ ] Explain “not detected” versus “human-created”.
-- [ ] Decide whether MySQL must run inside the same container for assessment or may be external.
-- [ ] Confirm whether originals need retention (default: no).
+- [x] MySQL runs in the same container as Apache/PHP for this learning project; no Docker Compose.
+- [x] Image retention is off by default; explicit opt-in only; delete retained images within 7 days.
+
+## 7. Confirmed Day 2 decisions and additional controls
+
+### Single-container LAMP (learning-only)
+Apache, PHP, and MySQL will run in one Ubuntu-based Docker container because that is the chosen learning-project constraint. This increases operational complexity and creates a larger failure domain than separate services. Use a process supervisor, explicit service health checks, least-privilege users, and persistent storage for the database. Never bake secrets into the image. This layout should be reconsidered for production.
+
+### Opt-in image retention, maximum 7 days
+- Do not retain the original image unless the user explicitly selects a save/retain option and understands the 7-day limit.
+- Store retained images outside the web root, under random server-generated names, with restrictive permissions.
+- Keep only the generated storage key and expiry timestamp in the database; do not store the original filename or full metadata by default.
+- Enforce expiry on the server, not merely in the UI. Add a cleanup routine/job that deletes expired images and reconciles orphaned database records.
+- Delete files on successful completion when not retained, and on validation, detector, database, and unexpected errors. Test interrupted requests and cleanup failures as well.
+- Protect retained images from cross-user access; do not expose direct public URLs. If accounts are introduced later, enforce ownership checks.
+- Document the retention policy on the upload form and avoid logging image bytes, full EXIF data, or sensitive details.
