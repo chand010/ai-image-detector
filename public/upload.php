@@ -102,15 +102,12 @@ try {
         'file_size' => $file['size'],
         'status' => 'not_configured',
     ]);
+    $analysisId = (int) $pdo->lastInsertId();
 } catch (Throwable $exception) {
     // Log only a generic event; do not expose database details to visitors.
     error_log('AI Image Detector: metadata save failed.');
     respond(503, 'The image passed validation, but the result could not be saved. Please try again later.');
 }
 
-respond(200, sprintf(
-    'Image validated and metadata saved: %s, %d × %d pixels. The original image was not saved. AI-origin detection is not configured, so this is not an AI detection result.',
-    $allowed[$mime],
-    $width,
-    $height
-));
+header('Location: /result.php?id=' . $analysisId, true, 303);
+exit;
