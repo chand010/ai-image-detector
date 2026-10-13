@@ -35,3 +35,5 @@ jobs:
           done
       - name: Run source-level security checks
         run: php tests/security_checks.php
+      - name: Run HTTP security smoke tests
+        run: bash tests/http_security_smoke.sh
