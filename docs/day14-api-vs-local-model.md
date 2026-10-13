@@ -19,7 +19,7 @@ Do not implement both at once. First prove the upload flow, result schema, error
 | What it answers | Whether supported provenance signals, such as C2PA credentials or supported SynthID, were detected. | Whether the image resembles the classifier's AI/human training categories. |
 | Coverage | Limited to signals and formats supported by the chosen provider; not a universal AI detector. | Depends on model training data and evaluation. May generalize poorly to new generators, edits, screenshots, or compression. |
 | Access | OpenAI documents POST /v1/content_provenance_checks; an organization without access may receive 404. Confirm account eligibility and current limits before building. | Download model weights and runtime dependencies from the selected repository. Access may require a Hugging Face account or model-specific terms. |
-| Cost | Usage/service dependent; check the provider's current pricing and account limits. Do not assume the endpoint is free. | No per-request inference vendor fee when run on your own hardware, but hardware, hosting, power, storage, updates, and engineering have real costs. Hosted GPU/CPU inference is paid. |
+| Cost | The official documentation currently describes default provenance checks as free under usage limits; higher limits require eligibility/approval. Confirm current terms and limits before deployment. | No per-request inference vendor fee when run on your own hardware, but hardware, hosting, power, storage, updates, and engineering have real costs. Hosted GPU/CPU inference is paid. |
 | Privacy | Image bytes leave your server and are processed by the provider. Review data handling, retention, terms, region, and consent/disclosure requirements before sending user uploads. | Images can remain on your server if the model is fully local. Protect logs, temporary files, access, and backups. If using a hosted model endpoint, images leave your server just like any external API. |
 | License | API terms govern usage; check current terms, access requirements, rate limits, and intended use. | Model weights and code can have different licenses. Check commercial use, attribution, redistribution, and any restrictions before choosing a model. |
 | Hardware | Minimal inference hardware on your host; requires outbound HTTPS, DNS, certificate validation, API key storage, and reliable connectivity. | Small classifiers may run on CPU but could be slow; larger models may need substantial RAM and a GPU. Benchmark the chosen model on the actual target machine. |
@@ -34,9 +34,10 @@ Do not implement both at once. First prove the upload flow, result schema, error
 
 - API guide: https://developers.openai.com/api/docs/guides/content-provenance
 - Provenance signal explanation: https://help.openai.com/en/articles/8912793-provenance-signals-in-openai-generated-content
-- OpenAI API pricing: https://openai.com/api/pricing/ (confirm whether and how the specific endpoint is billed before implementation)
+- API data controls: https://developers.openai.com/api/docs/guides/your-data
+- Current provenance pricing/access note: https://help.openai.com/en/articles/8912793-provenance-signals-in-openai-generated-content
 
-The current guide says the API checks supported OpenAI-associated C2PA Content Credentials and SynthID signals. It supports PNG, JPEG, and WebP images up to 50 MiB, but this application intentionally retains its own 5 MiB limit. The API documentation notes that an organization without access may receive 404 and that not_detected does not rule out AI generation. Confirm current access and pricing rather than assuming availability.
+The current guide says the API checks supported OpenAI-associated C2PA Content Credentials and SynthID signals. It supports PNG, JPEG, and WebP images up to 50 MiB, but this application intentionally retains its own 5 MiB limit. The API documentation notes that an organization without access may receive 404 and that not_detected does not rule out AI generation. The official Help Center currently describes default checks as free under usage limits and says higher-limit eligibility focuses on qualifying public-interest use cases; general commercial verification is outside that program's scope. Confirm current access and limits before implementation.
 
 ### Local classifier
 
