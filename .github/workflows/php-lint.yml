@@ -37,3 +37,5 @@ jobs:
         run: php tests/security_checks.php
       - name: Run HTTP security smoke tests
         run: bash tests/http_security_smoke.sh
+      - name: Run Docker and MySQL integration smoke test
+        run: bash tests/docker_integration_smoke.sh
