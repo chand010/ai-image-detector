@@ -1,4 +1,4 @@
-name: PHP Syntax Check
+name: PHP Tests
 
 on:
   push:
@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  php-lint:
-    name: Check PHP syntax
+  php-tests:
+    name: PHP syntax and security regression checks
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -33,3 +33,5 @@ jobs:
             echo "Checking $file"
             php -l "$file"
           done
+      - name: Run source-level security checks
+        run: php tests/security_checks.php
