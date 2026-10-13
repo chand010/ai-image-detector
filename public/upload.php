@@ -76,8 +76,6 @@ if ($width < 1 || $height < 1 || $width > intdiv($maxPixels, $height) ||
     respond(413, 'The image dimensions are too large to process safely.');
 }
 
-// Decode the image to reject files that pass superficial header checks but are corrupt.
-// GD must be enabled in the PHP image.
 $imageData = @file_get_contents($file['tmp_name']);
 if ($imageData === false) {
     respond(400, 'The uploaded image could not be read.');
@@ -89,10 +87,29 @@ if ($decoded === false) {
 }
 imagedestroy($decoded);
 
-// Day 3 prototype intentionally does not persist the uploaded original.
-// Detection integration and opt-in, seven-day retention are later milestones.
+// Save only validated metadata. The uploaded image itself is never stored.
+try {
+    require_once __DIR__ . '/../config/database.php';
+    $pdo = createDatabaseConnection();
+    $statement = $pdo->prepare(
+        'INSERT INTO analyses (image_mime, image_width, image_height, file_size_bytes, detection_status)
+         VALUES (:mime, :width, :height, :file_size, :status)'
+    );
+    $statement->execute([
+        'mime' => $mime,
+        'width' => $width,
+        'height' => $height,
+        'file_size' => $file['size'],
+        'status' => 'not_configured',
+    ]);
+} catch (Throwable $exception) {
+    // Log only a generic event; do not expose database details to visitors.
+    error_log('AI Image Detector: metadata save failed.');
+    respond(503, 'The image passed validation, but the result could not be saved. Please try again later.');
+}
+
 respond(200, sprintf(
-    'Validation passed: %s image, %d × %d pixels. No file was saved. AI-origin detection is not configured, so this is not an AI detection result.',
+    'Image validated and metadata saved: %s, %d × %d pixels. The original image was not saved. AI-origin detection is not configured, so this is not an AI detection result.',
     $allowed[$mime],
     $width,
     $height
