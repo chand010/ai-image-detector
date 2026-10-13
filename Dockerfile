@@ -9,6 +9,7 @@ RUN apt-get update \
         mysql-server \
         php-cli \
         php-common \
+        php-curl \
         php-gd \
         php-mysql \
         supervisor \
