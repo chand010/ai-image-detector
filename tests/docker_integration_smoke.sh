@@ -46,7 +46,7 @@ SERVER_STARTED=1
 
 ready=0
 for _ in $(seq 1 90); do
-    if curl --silent --show-error --max-time 2 "$BASE_URL/" -o "$BODY" 2>/dev/null; then
+    if curl --silent --show-error --max-time 2 -c "$COOKIE_JAR" "$BASE_URL/" -o "$BODY" 2>/dev/null; then
         ready=1
         break
     fi
