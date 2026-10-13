@@ -26,10 +26,11 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/ai-image-detector.conf
 RUN mkdir -p /var/log/supervisor /var/run/mysqld \
     && chown -R mysql:mysql /var/run/mysqld \
     && chown -R www-data:www-data /var/www/html \
-    && chmod -R a=rX /var/www/html
+    && chmod -R a=rX /var/www/html \
+    && chmod 0755 /var/www/html/docker/entrypoint.sh
 
 EXPOSE 80
 
 VOLUME ["/var/lib/mysql"]
 
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
+ENTRYPOINT ["/var/www/html/docker/entrypoint.sh"]
