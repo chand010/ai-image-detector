@@ -13,7 +13,6 @@ RUN apt-get update \
         php-mysql \
         supervisor \
         ca-certificates \
-    && a2enmod php* \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
@@ -27,8 +26,7 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/ai-image-detector.conf
 RUN mkdir -p /var/log/supervisor /var/run/mysqld \
     && chown -R mysql:mysql /var/run/mysqld \
     && chown -R www-data:www-data /var/www/html \
-    && chmod -R a=rX /var/www/html \
-    && a2dissite 000-default.conf >/dev/null 2>&1 || true
+    && chmod -R a=rX /var/www/html
 
 EXPOSE 80
 
