@@ -6,7 +6,7 @@ A security-focused, raw-PHP web application for inspecting uploaded images and p
 
 - Upload form and server-side checks for JPEG, PNG, and WebP.
 - 5 MiB application upload limit, MIME inspection, image-dimension/pixel limits, and image decode validation.
-- MySQL metadata history using PDO prepared statements.
+- MySQL metadata history using PDO prepared statements, scoped to a random browser-session token.
 - Result page separates file validation from AI-origin assessment.
 - Optional provenance provider adapter and response mapper exist, but **external image processing is disabled and not connected to uploads**.
 - Original uploaded image bytes are not saved by the current upload flow.
@@ -94,7 +94,7 @@ Never put real secrets in source control, in the Docker image, or in browser-sid
 ## Privacy and detection limitations
 
 - The app currently stores image metadata, not original image bytes.
-- Metadata history is not an account-based private workspace; do not deploy this prototype publicly until access control and data visibility are reviewed.
+- Result pages and history are scoped to a random browser-session token, with strict-mode sessions and HttpOnly/SameSite cookies. This is a basic privacy boundary, not user accounts or a substitute for a full public-deployment access-control review. Existing records created before the ownership migration are not visible to new sessions.
 - External provenance processing is a **NO-GO by default**. Before enabling it, review provider access, current limits/costs, terms, and data handling; then add a clear notice and obtain the required user consent.
 - A provenance API checks only supported provenance signals. No detected signal does not prove human authorship and does not rule out AI generation.
 - The current upload flow validates images but does not yet run an AI-origin detector.
