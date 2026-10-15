@@ -52,7 +52,7 @@ checkSource(
         '$maxPixels = 20_000_000;',
         'imagecreatefromstring(',
         '$pdo->prepare(',
-        "header('Location: /result.php?id=' . $analysisId, true, 303)",
+        "header('Location: /result.php?id=' . \$analysisId, true, 303)",
         "error_log('AI Image Detector: metadata save failed.')",
     ],
     [
