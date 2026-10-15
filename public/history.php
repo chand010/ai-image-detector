@@ -1,21 +1,29 @@
 <?php
 declare(strict_types=1);
 
+session_start();
+
 require_once __DIR__ . '/../config/database.php';
 
 $analyses = [];
 $errorMessage = null;
 
+$ownerToken = $_SESSION['analysis_owner_token'] ?? '';
+
 try {
-    $pdo = createDatabaseConnection();
-    $statement = $pdo->query(
-        'SELECT id, image_mime, image_width, image_height, file_size_bytes,
-                detection_status, detection_label, confidence, created_at
-         FROM analyses
-         ORDER BY created_at DESC, id DESC
-         LIMIT 50'
-    );
-    $analyses = $statement->fetchAll();
+    if (is_string($ownerToken) && preg_match('/^[a-f0-9]{64}$/', $ownerToken)) {
+        $pdo = createDatabaseConnection();
+        $statement = $pdo->prepare(
+            'SELECT id, image_mime, image_width, image_height, file_size_bytes,
+                    detection_status, detection_label, confidence, created_at
+             FROM analyses
+             WHERE owner_token_hash = :owner_hash
+             ORDER BY created_at DESC, id DESC
+             LIMIT 50'
+        );
+        $statement->execute(['owner_hash' => hash('sha256', $ownerToken)]);
+        $analyses = $statement->fetchAll();
+    }
 } catch (Throwable $error) {
     error_log('AI Image Detector: history retrieval failed.');
     http_response_code(503);
@@ -43,7 +51,7 @@ function formatBytes(int $bytes): string
     <main>
         <h1>Analysis History</h1>
         <p><a href="/">Return to image upload</a></p>
-        <p>Showing up to the 50 most recent records. Original image files are not stored.</p>
+        <p>Showing up to 50 analysis records from this browser session. Other sessions cannot view these records. Original image files are not stored.</p>
 
         <?php if ($errorMessage !== null): ?>
             <p role="alert"><?= escapeHtml($errorMessage) ?></p>
