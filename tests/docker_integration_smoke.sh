@@ -76,7 +76,7 @@ curl --silent --show-error --max-time 30 \
     -F "image=@$PNG_FILE;type=image/png" \
     "$BASE_URL/upload.php" || fail "Upload request failed"
 
-STATUS="$(awk 'toupper($1) ~ /^HTTP\\// { code=$2 } END { print code }' "$HEADERS")"
+STATUS="$(awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$HEADERS")"
 [[ "$STATUS" == "303" ]] || {
     cat "$BODY" >&2
     fail "Valid PNG upload expected HTTP 303, got ${STATUS:-no status}"
@@ -84,7 +84,7 @@ STATUS="$(awk 'toupper($1) ~ /^HTTP\\// { code=$2 } END { print code }' "$HEADER
 echo "PASS: Valid image upload returned HTTP 303"
 
 LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {gsub("\\r",""); print $2}' "$HEADERS" | tail -n1)"
-[[ "$LOCATION" =~ ^/result\\.php\\?id=[1-9][0-9]*$ ]] || fail "Upload redirect did not contain a valid result reference"
+[[ "$LOCATION" =~ ^/result\.php\?id=[1-9][0-9]*$ ]] || fail "Upload redirect did not contain a valid result reference"
 
 curl --silent --show-error --max-time 15 "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
 grep -q 'AI detection engine has not been connected' "$BODY" || fail "Result page did not explain that detection is not configured"
