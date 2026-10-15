@@ -62,7 +62,7 @@ echo "PASS: Docker container serves upload form"
 
 # A tiny 1x1 PNG used only as a disposable test fixture.
 base64 -d > "$PNG_FILE" <<'PNG'
-iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII=
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC
 PNG
 
 # HTML attributes may span multiple lines, so parse the complete response.
