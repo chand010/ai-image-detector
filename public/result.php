@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+session_start();
+
 require_once __DIR__ . '/../config/database.php';
 
 $analysis = null;
@@ -15,15 +17,24 @@ if ($id === false || $id === null) {
 } else {
     try {
         $pdo = createDatabaseConnection();
-        $statement = $pdo->prepare(
-            'SELECT id, image_mime, image_width, image_height, file_size_bytes,
-                    detection_status, detection_label, confidence, created_at
-             FROM analyses
-             WHERE id = :id
-             LIMIT 1'
-        );
-        $statement->execute(['id' => $id]);
-        $analysis = $statement->fetch();
+        $ownerToken = $_SESSION['analysis_owner_token'] ?? '';
+        if (!is_string($ownerToken) || !preg_match('/^[a-f0-9]{64}$/', $ownerToken)) {
+            http_response_code(404);
+            $errorMessage = 'This analysis record could not be found.';
+        } else {
+            $statement = $pdo->prepare(
+                'SELECT id, image_mime, image_width, image_height, file_size_bytes,
+                        detection_status, detection_label, confidence, created_at
+                 FROM analyses
+                 WHERE id = :id AND owner_token_hash = :owner_hash
+                 LIMIT 1'
+            );
+            $statement->execute([
+                'id' => $id,
+                'owner_hash' => hash('sha256', $ownerToken),
+            ]);
+            $analysis = $statement->fetch();
+        }
 
         if ($analysis === false) {
             http_response_code(404);
