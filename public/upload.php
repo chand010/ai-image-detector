@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 session_start();
 
+if (!isset($_SESSION['analysis_owner_token']) || !is_string($_SESSION['analysis_owner_token'])) {
+    $_SESSION['analysis_owner_token'] = bin2hex(random_bytes(32));
+}
+
 function respond(int $status, string $message): never
 {
     http_response_code($status);
@@ -92,10 +96,11 @@ try {
     require_once __DIR__ . '/../config/database.php';
     $pdo = createDatabaseConnection();
     $statement = $pdo->prepare(
-        'INSERT INTO analyses (image_mime, image_width, image_height, file_size_bytes, detection_status)
-         VALUES (:mime, :width, :height, :file_size, :status)'
+        'INSERT INTO analyses (owner_token_hash, image_mime, image_width, image_height, file_size_bytes, detection_status)
+         VALUES (:owner_hash, :mime, :width, :height, :file_size, :status)'
     );
     $statement->execute([
+        'owner_hash' => hash('sha256', $_SESSION['analysis_owner_token']),
         'mime' => $mime,
         'width' => $width,
         'height' => $height,
