@@ -16,6 +16,15 @@ RUN apt-get update \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+RUN printf '%s\n' \
+    'file_uploads=On' \
+    'upload_max_filesize=6M' \
+    'post_max_size=7M' \
+    'max_file_uploads=1' \
+    'memory_limit=256M' \
+    'max_execution_time=30' \
+    > /etc/php/8.3/apache2/conf.d/99-ai-image-detector.ini
+
 WORKDIR /var/www/html
 
 # The web root is configured as /var/www/html/public so project files
