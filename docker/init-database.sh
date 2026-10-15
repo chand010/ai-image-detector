@@ -26,21 +26,23 @@ for attempt in $(seq 1 60); do
     sleep 2
 done
 
-# Create the schema first. The SQL file only defines the database and table.
-mysql --protocol=socket --user=root < /var/www/html/database/schema.sql
+# The schema file uses the default database name. Identifiers are validated
+# above, so substitute the configured name before applying the schema.
+sed "s/ai_image_detector/$DB_NAME/g" /var/www/html/database/schema.sql |
+    mysql --protocol=socket --user=root
 
 # Add session ownership to databases created by earlier versions.
 # Existing rows remain unowned and cannot be viewed by new browser sessions.
-mysql --protocol=socket --user=root <<'SQL'
+mysql --protocol=socket --user=root <<SQL
 SET @owner_column_exists = (
     SELECT COUNT(*) FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = 'ai_image_detector'
+    WHERE TABLE_SCHEMA = '$DB_NAME'
       AND TABLE_NAME = 'analyses'
       AND COLUMN_NAME = 'owner_token_hash'
 );
 SET @owner_migration = IF(
     @owner_column_exists = 0,
-    'ALTER TABLE ai_image_detector.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
+    'ALTER TABLE `$DB_NAME`.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
     'SELECT 1'
 );
 PREPARE owner_migration_stmt FROM @owner_migration;
@@ -49,13 +51,13 @@ DEALLOCATE PREPARE owner_migration_stmt;
 
 SET @owner_index_exists = (
     SELECT COUNT(*) FROM information_schema.STATISTICS
-    WHERE TABLE_SCHEMA = 'ai_image_detector'
+    WHERE TABLE_SCHEMA = '$DB_NAME'
       AND TABLE_NAME = 'analyses'
       AND INDEX_NAME = 'idx_analyses_owner_created'
 );
 SET @owner_index_migration = IF(
     @owner_index_exists = 0,
-    'CREATE INDEX idx_analyses_owner_created ON ai_image_detector.analyses (owner_token_hash, created_at)',
+    'CREATE INDEX idx_analyses_owner_created ON `$DB_NAME`.analyses (owner_token_hash, created_at)',
     'SELECT 1'
 );
 PREPARE owner_index_stmt FROM @owner_index_migration;
