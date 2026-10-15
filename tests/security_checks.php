@@ -43,6 +43,7 @@ checkSource(
     'public/upload.php',
     [
         "hash_equals(",
+        "hash('sha256', $_SESSION['analysis_owner_token'])",
         "is_uploaded_file(",
         "new finfo(FILEINFO_MIME_TYPE)",
         "'image/jpeg'",
@@ -67,6 +68,7 @@ checkSource(
     [
         'ORDER BY created_at DESC, id DESC',
         'LIMIT 50',
+        'WHERE owner_token_hash = :owner_hash',
         'htmlspecialchars(',
         "error_log('AI Image Detector: history retrieval failed.')",
     ]
@@ -78,9 +80,19 @@ checkSource(
     [
         '$pdo->prepare(',
         'FILTER_VALIDATE_INT',
+        'owner_token_hash = :owner_hash',
         'htmlspecialchars(',
         'AI detection engine has not been connected.',
         'did not save the original image',
+    ]
+);
+
+checkSource(
+    'Session ownership schema',
+    'database/schema.sql',
+    [
+        'owner_token_hash CHAR(64) NULL',
+        'idx_analyses_owner_created (owner_token_hash, created_at)',
     ]
 );
 
