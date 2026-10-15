@@ -26,56 +26,73 @@ Passing validation means the file was readable and supported; it does not mean i
 
 ## Run locally with Docker
 
-Requirements: Docker Engine or Docker Desktop.
+Requirements: Docker Engine or Docker Desktop. On Windows, start Docker Desktop and wait until it says the engine is running.
 
-1. Clone the repository and enter its directory:
+### Option A — Download ZIP (no Git required)
+
+1. Download the ZIP archive of this repository from GitHub and extract it.
+2. Open PowerShell in the extracted project folder. Confirm that this folder contains the `Dockerfile`, `public`, `database`, and `docker` folders.
+3. Build the image:
+
+   ```powershell
+   docker build -t ai-image-detector:local .
+   ```
+
+4. Start the app with a strong database password and a persistent database volume:
+
+   ```powershell
+   docker run -d --name ai-image-detector -p 8080:80 -e DB_PASSWORD="Replace-With-A-Unique-Strong-Password-123" -v ai-image-detector-db:/var/lib/mysql ai-image-detector:local
+   ```
+
+   Replace the example password with your own unique random password. Use 16–128 characters from letters, numbers, and `_@#%+=.-`. Never commit a real password to GitHub.
+
+5. Open **http://localhost:8080** in your browser. The first startup may take a minute or two while the database initializes.
+6. If the page does not load, inspect the logs:
+
+   ```powershell
+   docker logs -f ai-image-detector
+   ```
+
+### Option B — Clone with Git
 
    ```bash
    git clone https://github.com/chand010/ai-image-detector.git
    cd ai-image-detector
-   ```
-
-2. Build the image:
-
-   ```bash
    docker build -t ai-image-detector:local .
+   docker run -d --name ai-image-detector -p 8080:80 -e DB_PASSWORD='Replace-With-A-Unique-Strong-Password-123' -v ai-image-detector-db:/var/lib/mysql ai-image-detector:local
    ```
 
-3. Start the container with a strong database password and a persistent database volume. Replace the example password with a unique random value; do not commit it to Git.
+The container creates the schema and a restricted application database account during startup. Defaults are `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME=ai_image_detector`, and `DB_USER=ai_image_app`.
 
-   ```bash
-   docker run -d \
-     --name ai-image-detector \
-     -p 8080:80 \
-     -e DB_PASSWORD='Replace-With-A-Unique-Strong-Password-123' \
-     -v ai-image-detector-db:/var/lib/mysql \
-     ai-image-detector:local
-   ```
+### Try the application
 
-   The container creates the schema and a restricted application database account during startup. Defaults are `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME=ai_image_detector`, and `DB_USER=ai_image_app`.
+1. Open the home page and choose a JPEG, PNG, or WebP image under 5 MiB.
+2. Submit it. The app validates its actual file type, dimensions, and image decoding.
+3. Review the result page, which stores and displays metadata without retaining the original image.
+4. Open **Analysis History** to see records from the same browser session.
+5. Try a non-image file or a large image to see the validation error handling.
 
-4. Open `http://localhost:8080` in your browser.
+**Important:** this is currently a runnable upload-validation and metadata-history prototype. The AI-origin detection engine is not connected, and external image processing is disabled. The result page will say so rather than pretend the image was detected as AI-generated or human-made.
 
-5. Check startup logs if the page is temporarily unavailable:
+### Stop, restart, or remove the app
 
-   ```bash
+   ```powershell
+   docker stop ai-image-detector
+   docker start ai-image-detector
    docker logs -f ai-image-detector
    ```
 
-To stop and restart:
+To remove the container while keeping its database volume:
 
-```bash
-docker stop ai-image-detector
-docker start ai-image-detector
-```
+   ```powershell
+   docker rm -f ai-image-detector
+   ```
 
-To remove the container while keeping the database volume:
+The named volume keeps database files when the container is replaced. To permanently delete the local database data, deliberately run:
 
-```bash
-docker rm -f ai-image-detector
-```
-
-The named volume keeps database files when the container is replaced. To permanently delete the local database data, deliberately run `docker volume rm ai-image-detector-db`.
+   ```powershell
+   docker volume rm ai-image-detector-db
+   ```
 
 ## Configuration
 
