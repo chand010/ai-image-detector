@@ -29,6 +29,40 @@ done
 # Create the schema first. The SQL file only defines the database and table.
 mysql --protocol=socket --user=root < /var/www/html/database/schema.sql
 
+# Add session ownership to databases created by earlier versions.
+# Existing rows remain unowned and cannot be viewed by new browser sessions.
+mysql --protocol=socket --user=root <<'SQL'
+SET @owner_column_exists = (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = 'ai_image_detector'
+      AND TABLE_NAME = 'analyses'
+      AND COLUMN_NAME = 'owner_token_hash'
+);
+SET @owner_migration = IF(
+    @owner_column_exists = 0,
+    'ALTER TABLE ai_image_detector.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
+    'SELECT 1'
+);
+PREPARE owner_migration_stmt FROM @owner_migration;
+EXECUTE owner_migration_stmt;
+DEALLOCATE PREPARE owner_migration_stmt;
+
+SET @owner_index_exists = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = 'ai_image_detector'
+      AND TABLE_NAME = 'analyses'
+      AND INDEX_NAME = 'idx_analyses_owner_created'
+);
+SET @owner_index_migration = IF(
+    @owner_index_exists = 0,
+    'CREATE INDEX idx_analyses_owner_created ON ai_image_detector.analyses (owner_token_hash, created_at)',
+    'SELECT 1'
+);
+PREPARE owner_index_stmt FROM @owner_index_migration;
+EXECUTE owner_index_stmt;
+DEALLOCATE PREPARE owner_index_stmt;
+SQL
+
 # Create or update a dedicated, non-root account. Limit it to this database.
 mysql --protocol=socket --user=root <<SQL
 CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
