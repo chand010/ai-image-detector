@@ -10,6 +10,7 @@ USE ai_image_detector;
 
 CREATE TABLE IF NOT EXISTS analyses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    owner_token_hash CHAR(64) NULL,
     image_mime VARCHAR(32) NOT NULL,
     image_width INT UNSIGNED NOT NULL,
     image_height INT UNSIGNED NOT NULL,
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     INDEX idx_analyses_created_at (created_at),
+    INDEX idx_analyses_owner_created (owner_token_hash, created_at),
     CONSTRAINT chk_analyses_dimensions CHECK (
         image_width > 0 AND image_height > 0
     ),
