@@ -19,21 +19,31 @@ function checkSource(string $name, string $path, array $needles, array $forbidde
     $fullPath = $root . '/' . $path;
     $source = file_get_contents($fullPath);
     if ($source === false) {
-        $failures[] = "$name: could not read $path";
+        $failures[] = sprintf('%s: could not read %s', $name, $path);
         return;
     }
 
     foreach ($needles as $needle) {
         $checks++;
         if (!str_contains($source, $needle)) {
-            $failures[] = "$name: expected control not found in $path: $needle";
+            $failures[] = sprintf(
+                '%s: expected control not found in %s: %s',
+                $name,
+                $path,
+                $needle
+            );
         }
     }
 
     foreach ($forbidden as $needle) {
         $checks++;
         if (str_contains($source, $needle)) {
-            $failures[] = "$name: forbidden pattern found in $path: $needle";
+            $failures[] = sprintf(
+                '%s: forbidden pattern found in %s: %s',
+                $name,
+                $path,
+                $needle
+            );
         }
     }
 }
