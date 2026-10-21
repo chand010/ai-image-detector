@@ -87,7 +87,7 @@ LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {gsub("\\r",""); print $2}' "$
 [[ "$LOCATION" =~ ^/result\.php\?id=[1-9][0-9]*$ ]] || fail "Upload redirect did not contain a valid result reference"
 
 curl --silent --show-error --max-time 15 -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
-grep -q 'AI detection engine has not been connected' "$BODY" || fail "Result page did not explain that detection is not configured"
+grep -q 'External provenance was not requested or is disabled' "$BODY" || fail "Result page did not explain that detection was not run"
 grep -q 'Image validation' "$BODY" || fail "Result page did not show image validation"
 echo "PASS: Result page displays saved record and honest detection status"
 
