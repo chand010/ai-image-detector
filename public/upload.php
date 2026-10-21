@@ -111,9 +111,20 @@ $detection = [
 ];
 
 if ($consentGiven) {
-    require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
-    $provider = new OpenAIProvenanceProvider();
-    $detection = $provider->analyze($file['tmp_name'], $mime);
+    try {
+        require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
+        $provider = new OpenAIProvenanceProvider();
+        $detection = $provider->analyze($file['tmp_name'], $mime);
+    } catch (Throwable $error) {
+        // Keep provider failures generic; never expose response bodies or secrets.
+        error_log('AI Image Detector: provenance provider failed unexpectedly.');
+        $detection = [
+            'provider' => 'openai_content_provenance',
+            'status' => 'unavailable',
+            'signals' => [],
+            'error_code' => 'provider_internal_error',
+        ];
+    }
 }
 
 $signalsJson = json_encode($detection['signals'], JSON_THROW_ON_ERROR);
