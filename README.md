@@ -9,6 +9,7 @@ A security-focused, raw-PHP web application for inspecting uploaded images and p
 - MySQL metadata history using PDO prepared statements, scoped to a random browser-session token.
 - Result page separates file validation from AI-origin assessment.
 - Optional provenance provider adapter and response mapper exist, but **external image processing is disabled and not connected to uploads**.
+- A local-classifier response mapper and unit tests are being added; the live classifier provider and upload integration are still pending.
 - Original uploaded image bytes are not saved by the current upload flow.
 - CI/CD debugging is deliberately pending while the core app is completed. SonarCloud and external hosting are also pending.
 
@@ -72,7 +73,7 @@ The container creates the schema and a restricted application database account d
 4. Open **Analysis History** to see records from the same browser session.
 5. Try a non-image file or a large image to see the validation error handling.
 
-**Important:** this is currently a runnable upload-validation and metadata-history prototype. The AI-origin detection engine is not connected, and external image processing is disabled. The result page will say so rather than pretend the image was detected as AI-generated or human-made.
+**Important:** this is currently a runnable upload-validation and metadata-history prototype. The AI-origin detection engine is not connected to the upload flow yet, and external image processing is disabled. The result page will say so rather than pretend the image was detected as AI-generated or human-made. See [docs/DAY23-DETECTION-ENGINE.md](docs/DAY23-DETECTION-ENGINE.md) for the current evaluation plan.
 
 ### Stop, restart, or remove the app
 
