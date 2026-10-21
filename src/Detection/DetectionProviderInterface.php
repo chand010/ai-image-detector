@@ -18,7 +18,8 @@ interface DetectionProviderInterface
      *   provider: string,
      *   status: 'completed'|'inconclusive'|'unavailable'|'failed',
      *   signals: list<array{type: string, outcome: string, explanation: string}>,
-     *   error_code: ?string
+     *   error_code: ?string,
+ *   metrics: ?array{probability: float, confidence: float, ai_score: int, verdict: string, mode: string}
      * }
      */
     public function analyze(string $temporaryPath, string $mimeType): array;
