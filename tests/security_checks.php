@@ -86,6 +86,8 @@ checkSource(
         'owner_token_hash = :owner_hash',
         'htmlspecialchars(',
         'did not save the original image',
+        'external_processing_consent', 
+        'A “not detected” result means no supported signal was found.',
     ]
 );
 
@@ -94,6 +96,10 @@ checkSource(
     'database/schema.sql',
     [
         'owner_token_hash CHAR(64) NULL',
+        'detection_signals_json JSON NULL',
+        'external_processing_consent TINYINT(1) NOT NULL DEFAULT 0',
+        "'inconclusive'",
+        "'unavailable'",
         'idx_analyses_owner_created (owner_token_hash, created_at)',
     ]
 );
