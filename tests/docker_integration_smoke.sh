@@ -86,12 +86,12 @@ echo "PASS: Valid image upload returned HTTP 303"
 LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {gsub("\\r",""); print $2}' "$HEADERS" | tail -n1)"
 [[ "$LOCATION" =~ ^/result\.php\?id=[1-9][0-9]*$ ]] || fail "Upload redirect did not contain a valid result reference"
 
-curl --silent --show-error --max-time 15 "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
+curl --silent --show-error --max-time 15 -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
 grep -q 'AI detection engine has not been connected' "$BODY" || fail "Result page did not explain that detection is not configured"
 grep -q 'Image validation' "$BODY" || fail "Result page did not show image validation"
 echo "PASS: Result page displays saved record and honest detection status"
 
-curl --silent --show-error --max-time 15 "$BASE_URL/history.php" -o "$BODY" || fail "Could not fetch history page"
+curl --silent --show-error --max-time 15 -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE_URL/history.php" -o "$BODY" || fail "Could not fetch history page"
 grep -q 'image/png' "$BODY" || fail "History page did not include the uploaded PNG metadata"
 echo "PASS: History page includes saved image metadata"
 
