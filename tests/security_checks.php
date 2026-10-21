@@ -52,8 +52,11 @@ checkSource(
         '$maxBytes = 5 * 1024 * 1024;',
         '$maxPixels = 20_000_000;',
         'imagecreatefromstring(',
+        "\$consentGiven = (\$_POST['external_processing_consent'] ?? null) === 'yes';",
+        "\$provider->analyze(\$file['tmp_name'], \$mime)",
+        "ENABLE_EXTERNAL_PROVENANCE",
         '$pdo->prepare(',
-        "header('Location: /result.php?id=' . \$analysisId, true, 303)",
+        'header(\'Location: /result.php?id=\' . $analysisId, true, 303)',
         "error_log('AI Image Detector: metadata save failed.')",
     ],
     [
@@ -82,7 +85,6 @@ checkSource(
         'FILTER_VALIDATE_INT',
         'owner_token_hash = :owner_hash',
         'htmlspecialchars(',
-        'AI detection engine has not been connected.',
         'did not save the original image',
     ]
 );
