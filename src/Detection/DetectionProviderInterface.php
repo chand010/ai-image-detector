@@ -14,13 +14,7 @@ interface DetectionProviderInterface
      *
      * @param string $temporaryPath Server-generated temporary upload path.
      * @param string $mimeType Server-detected MIME type.
-     * @return array{
-     *   provider: string,
-     *   status: 'completed'|'inconclusive'|'unavailable'|'failed',
-     *   signals: list<array{type: string, outcome: string, explanation: string}>,
-     *   error_code: ?string,
- *   metrics: ?array{probability: float, confidence: float, ai_score: int, verdict: string, mode: string}
-     * }
+     * @return array<string, mixed> Normalized result. The metrics key is optional.
      */
     public function analyze(string $temporaryPath, string $mimeType): array;
 }

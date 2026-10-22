@@ -122,3 +122,31 @@ php tests/local_classifier_response_mapper.php
 ~~~
 
 These tests cover response mapping only. They do not test a running API, detector accuracy, the PHP upload flow, Docker networking, or the full application. CI and end-to-end checks remain to be verified.
+
+
+## Progress update — 23 October 2026: local provider scaffold
+
+The branch now includes `src/Detection/LocalClassifierProvider.php`. It is a guarded HTTP adapter for the `aidetect` service, with the destination fixed to `http://aidetect:8000/analyze` on a private user-defined Docker network. The host is not user-configurable, redirects are disabled, the connection and total time are bounded, the response is capped at 64 KiB, and the provider is disabled unless `ENABLE_LOCAL_CLASSIFIER=true`.
+
+The new `tests/local_classifier_provider_disabled.php` checks the disabled-by-default behavior and rejects unsupported MIME or missing input before making an HTTP request.
+
+Run these checks:
+
+~~~bash
+php -l src/Detection/LocalClassifierProvider.php
+php -l tests/local_classifier_provider_disabled.php
+php tests/local_classifier_provider_disabled.php
+php -l src/Detection/LocalClassifierResponseMapper.php
+php tests/local_classifier_response_mapper.php
+~~~
+
+These tests cover PHP syntax, guard behavior, and response mapping only. They do not call a live detector, test Docker networking, connect the provider to `public/upload.php`, or prove classification accuracy. The provider is **not yet integrated into the upload flow**.
+
+### Next integration checkpoint
+
+1. Start the detector on a private Docker network with the name `aidetect`, without publishing its port.
+2. Connect the existing LAMP container to that network.
+3. Wire the provider into the validated upload flow only when explicitly enabled.
+4. Add database fields/migration for detector status, score, confidence, and mode; update result/history pages.
+5. Add an end-to-end Docker test and record the actual run output.
+6. Keep external provenance disabled; keep the original image temporary and do not store image bytes.
