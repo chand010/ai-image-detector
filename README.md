@@ -130,3 +130,4 @@ The test suite includes PHP syntax checks, source-level security assertions, pro
 - `docs/day14-api-vs-local-model.md` — provider vs local classifier comparison
 - `docs/day15-privacy-cost-review.md` — privacy/cost approval checklist
 - `docs/day19-security-review.md` — consent gate, temporary-file handling, and security review
+- `docs/day24-openai-provenance-api.md` — API contract, cost/privacy, and CI findings
