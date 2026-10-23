@@ -19,21 +19,21 @@ function checkSource(string $name, string $path, array $needles, array $forbidde
     $fullPath = $root . '/' . $path;
     $source = file_get_contents($fullPath);
     if ($source === false) {
-        $failures[] = "$name: could not read $path";
+        $failures[] = sprintf('%s: could not read %s', $name, $path);
         return;
     }
 
     foreach ($needles as $needle) {
         $checks++;
         if (!str_contains($source, $needle)) {
-            $failures[] = "$name: expected control not found in $path: $needle";
+            $failures[] = sprintf('%s: expected control not found in %s: %s', $name, $path, $needle);
         }
     }
 
     foreach ($forbidden as $needle) {
         $checks++;
         if (str_contains($source, $needle)) {
-            $failures[] = "$name: forbidden pattern found in $path: $needle";
+            $failures[] = sprintf('%s: forbidden pattern found in %s: %s', $name, $path, $needle);
         }
     }
 }
@@ -42,19 +42,21 @@ checkSource(
     'Upload protections',
     'public/upload.php',
     [
-        "hash_equals(",
-        "hash('sha256', \$_SESSION['analysis_owner_token'])",
-        "is_uploaded_file(",
-        "new finfo(FILEINFO_MIME_TYPE)",
+        'hash_equals(',
+        'hash(\'sha256\', $_SESSION[\'analysis_owner_token\'])',
+        'is_uploaded_file(',
+        'new finfo(FILEINFO_MIME_TYPE)',
         "'image/jpeg'",
         "'image/png'",
         "'image/webp'",
         '$maxBytes = 5 * 1024 * 1024;',
         '$maxPixels = 20_000_000;',
         'imagecreatefromstring(',
-        "\$consentGiven = (\$_POST['external_processing_consent'] ?? null) === 'yes';",
-        "\$provider->analyze(\$file['tmp_name'], \$mime)",
-        "ENABLE_EXTERNAL_PROVENANCE",
+        '$consentGiven = ($_POST[\'external_processing_consent\'] ?? null) === \'yes\';',
+        '$provider->analyze($file[\'tmp_name\'], $mime)',
+        'ENABLE_EXTERNAL_PROVENANCE',
+        '@unlink($file[\'tmp_name\'])',
+        'temporary upload cleanup failed.',
         '$pdo->prepare(',
         'header(\'Location: /result.php?id=\' . $analysisId, true, 303)',
         "error_log('AI Image Detector: metadata save failed.')",
@@ -86,7 +88,7 @@ checkSource(
         'owner_token_hash = :owner_hash',
         'htmlspecialchars(',
         'did not save the original image',
-        'external_processing_consent', 
+        'external_processing_consent',
         'A “not detected” result means no supported signal was found.',
     ]
 );
