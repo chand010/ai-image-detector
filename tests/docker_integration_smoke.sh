@@ -25,6 +25,10 @@ trap cleanup EXIT
 
 fail() {
     echo "FAIL: $*" >&2
+    # Preserve container diagnostics for every failure, not only startup failures.
+    if [[ "$SERVER_STARTED" == 1 ]]; then
+        docker logs "$CONTAINER_NAME" >"$SERVER_LOG" 2>&1 || true
+    fi
     if [[ -s "$SERVER_LOG" ]]; then
         echo "--- Docker container logs ---" >&2
         cat "$SERVER_LOG" >&2
@@ -53,7 +57,6 @@ for _ in $(seq 1 90); do
     sleep 2
 done
 if [[ "$ready" != 1 ]]; then
-    docker logs "$CONTAINER_NAME" >"$SERVER_LOG" 2>&1 || true
     fail "Container did not serve the upload page within 180 seconds"
 fi
 
