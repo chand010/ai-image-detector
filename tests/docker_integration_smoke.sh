@@ -48,20 +48,34 @@ docker run -d --name "$CONTAINER_NAME" \
     "$IMAGE_TAG" >/dev/null
 SERVER_STARTED=1
 
-ready=0
+http_ready=0
 for _ in $(seq 1 90); do
     if curl --silent --show-error --max-time 2 -c "$COOKIE_JAR" "$BASE_URL/" -o "$BODY" 2>/dev/null; then
-        ready=1
+        http_ready=1
         break
     fi
     sleep 2
 done
-if [[ "$ready" != 1 ]]; then
-    fail "Container did not serve the upload page within 180 seconds"
-fi
+[[ "$http_ready" == 1 ]] || fail "Container did not serve the upload page within 180 seconds"
+
+# Apache can serve the form before the one-shot DB initializer finishes.
+# Wait for the restricted app account to query the actual schema over TCP.
+db_ready=0
+for _ in $(seq 1 60); do
+    if docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
+        mysql --protocol=tcp --host=127.0.0.1 --user=ai_image_app \
+        --batch --skip-column-names \
+        -e "SELECT 1 FROM ai_image_detector.analyses LIMIT 0;" >/dev/null 2>&1; then
+        db_ready=1
+        break
+    fi
+    sleep 2
+done
+[[ "$db_ready" == 1 ]] || fail "Application database account/schema did not become ready within 120 seconds"
 
 grep -q 'name="csrf_token"' "$BODY" || fail "Upload page is missing the CSRF token field"
 echo "PASS: Docker container serves upload form"
+echo "PASS: MySQL schema is ready for the restricted application account"
 
 # A tiny 1x1 PNG used only as a disposable test fixture.
 base64 -d > "$PNG_FILE" <<'PNG'
