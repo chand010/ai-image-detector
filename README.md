@@ -1,18 +1,19 @@
+
 # AI Image Detector
 
-A security-focused, raw-PHP web application for inspecting uploaded images and preparing cautious provenance checks. It is built for learning and is **not a universal AI-image detector or forensic proof tool**.
+A security-focused, raw-PHP web application for validating uploaded images and checking supported provenance signals. It is built for learning and is **not a universal AI-image detector or forensic proof tool**.
 
 ## Current status
 
-- Upload form and server-side checks for JPEG, PNG, and WebP.
-- 5 MiB application upload limit, MIME inspection, image-dimension/pixel limits, and image decode validation.
+- Upload form with server-side validation for JPEG, PNG, and WebP.
+- 5 MiB application upload limit, MIME inspection, dimension/pixel limits, and image decode validation.
 - MySQL metadata history using PDO prepared statements, scoped to a random browser-session token.
-- Result page separates file validation from AI-origin assessment.
-- Optional provenance provider adapter and response mapper exist, but **external image processing is disabled and not connected to uploads**.
-- Original uploaded image bytes are not saved by the current upload flow.
-- CI/CD debugging is deliberately pending while the core app is completed. SonarCloud and external hosting are also pending.
+- OpenAI Content Provenance provider is connected to the upload flow, but an external request requires **both** an unchecked-by-default per-upload consent checkbox and the server-side ENABLE_EXTERNAL_PROVENANCE=true setting.
+- External provenance processing remains disabled by default. No live OpenAI request was made as part of the current code review.
+- Uploaded image bytes are not stored in MySQL or permanent application storage. The PHP temporary upload is explicitly deleted after validation/analysis; only metadata and normalized provenance results are saved.
+- The current engine checks supported OpenAI provenance signals. It does not classify all AI-generated images and does not detect every provider.
 
-Passing validation means the file was readable and supported; it does not mean it is AI-generated or human-made.
+Passing image validation means the file was readable and supported; it does not mean it is AI-generated or human-made.
 
 ## Architecture
 
@@ -46,8 +47,8 @@ Requirements: Docker Engine or Docker Desktop. On Windows, start Docker Desktop 
 
    Replace the example password with your own unique random password. Use 16–128 characters from letters, numbers, and `_@#%+=.-`. Never commit a real password to GitHub.
 
-5. Open **http://localhost:8080** in your browser. The first startup may take a minute or two while the database initializes.
-6. If the page does not load, inspect the logs:
+5. Open **http://localhost:8080** in your browser. The first startup may take a minute or two while MySQL initializes.
+6. If the page does not load or uploads fail, inspect the logs:
 
    ```powershell
    docker logs -f ai-image-detector
@@ -62,17 +63,18 @@ Requirements: Docker Engine or Docker Desktop. On Windows, start Docker Desktop 
    docker run -d --name ai-image-detector -p 8080:80 -e DB_PASSWORD='Replace-With-A-Unique-Strong-Password-123' -v ai-image-detector-db:/var/lib/mysql ai-image-detector:local
    ```
 
-The container creates the schema and a restricted application database account during startup. Defaults are `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME=ai_image_detector`, and `DB_USER=ai_image_app`.
+The container initializes the schema and restricted application database account during startup. Defaults are `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME=ai_image_detector`, and `DB_USER=ai_image_app`.
 
 ### Try the application
 
 1. Open the home page and choose a JPEG, PNG, or WebP image under 5 MiB.
-2. Submit it. The app validates its actual file type, dimensions, and image decoding.
-3. Review the result page, which stores and displays metadata without retaining the original image.
-4. Open **Analysis History** to see records from the same browser session.
-5. Try a non-image file or a large image to see the validation error handling.
+2. Leave the external provenance checkbox unchecked for a local-only validation run.
+3. If you later obtain approval to enable external processing, review the notice and explicitly opt in for that upload. The server must also be configured with `ENABLE_EXTERNAL_PROVENANCE=true` and a valid `OPENAI_API_KEY`; otherwise no external request is sent.
+4. Review the result page, which stores metadata and normalized signals without retaining the original image.
+5. Open **Analysis History** to see records from the same browser session.
+6. Try a non-image file or an oversized image to test validation errors.
 
-**Important:** this is currently a runnable upload-validation and metadata-history prototype. The AI-origin detection engine is not connected, and external image processing is disabled. The result page will say so rather than pretend the image was detected as AI-generated or human-made.
+**Important:** the API checks supported OpenAI provenance signals only. A `not_detected` outcome is not proof that an image is human-created and does not rule out images generated by other AI systems.
 
 ### Stop, restart, or remove the app
 
@@ -103,23 +105,23 @@ The named volume keeps database files when the container is replaced. To permane
 | `DB_NAME` | Database name | `ai_image_detector` |
 | `DB_USER` | Restricted app account | `ai_image_app` in startup script |
 | `DB_PASSWORD` | Database password | Required at container startup |
-| `ENABLE_EXTERNAL_PROVENANCE` | Explicit provider enable flag | Must remain `false` / unset until approval |
-| `OPENAI_API_KEY` | Optional provider credential | Not needed while provider is disabled |
+| `ENABLE_EXTERNAL_PROVENANCE` | Explicit provider enable flag | Disabled unless explicitly set to `true` |
+| `OPENAI_API_KEY` | Provider credential | Required only if external processing is enabled |
 
 Never put real secrets in source control, in the Docker image, or in browser-side code. The example environment file is documentation, not a production secret store.
 
 ## Privacy and detection limitations
 
-- The app currently stores image metadata, not original image bytes.
+- The app stores image metadata and normalized provenance results, not original image bytes.
+- The upload is processed from PHP's temporary upload path and explicitly unlinked after validation/analysis. No original-image retention option is implemented or planned under the current policy.
 - Result pages and history are scoped to a random browser-session token, with strict-mode sessions and HttpOnly/SameSite cookies. This is a basic privacy boundary, not user accounts or a substitute for a full public-deployment access-control review. Existing records created before the ownership migration are not visible to new sessions.
-- External provenance processing is a **NO-GO by default**. Before enabling it, review provider access, current limits/costs, terms, and data handling; then add a clear notice and obtain the required user consent.
-- A provenance API checks only supported provenance signals. No detected signal does not prove human authorship and does not rule out AI generation.
-- The current upload flow validates images but does not yet run an AI-origin detector.
-- Opt-in image retention (private storage and automatic deletion within seven days) is specified as a future requirement and is not implemented in the current upload flow.
+- External provenance processing is disabled by default. Enabling it requires a server-side decision plus explicit consent for each upload. Review provider access, current limits, terms, and data handling before enabling it.
+- The Content Provenance API checks supported OpenAI-issued signals, including C2PA credentials and SynthID watermarks. It is not a general-purpose classifier for every AI provider.
+- Missing signals do not prove human authorship. Compression, cropping, metadata removal, legacy models, and unsupported generators may lead to no signal being detected.
 
 ## Tests and current CI status
 
-Local PHP/source checks and HTTP/Docker smoke tests are available under `tests/`. CI/CD troubleshooting is intentionally deferred until the core application is ready, so do not interpret an old or unverified workflow result as a passing build. Run tests locally and record the actual result when you do.
+The test suite includes PHP syntax checks, source-level security assertions, provenance response-mapper tests, disabled-provider tests, HTTP smoke tests, and Docker/MySQL integration tests. See the GitHub Actions run linked from the current pull request for the actual outcome; do not treat an unrun test as passing. SonarCloud configuration was not changed as part of this work.
 
 ## Project documentation
 
@@ -127,3 +129,4 @@ Local PHP/source checks and HTTP/Docker smoke tests are available under `tests/`
 - `docs/threat-model.md` — security boundaries and risks
 - `docs/day14-api-vs-local-model.md` — provider vs local classifier comparison
 - `docs/day15-privacy-cost-review.md` — privacy/cost approval checklist
+- `docs/day19-security-review.md` — consent gate, temporary-file handling, and security review
