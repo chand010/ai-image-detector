@@ -110,20 +110,26 @@ $detection = [
     'error_code' => null,
 ];
 
-if ($consentGiven) {
-    try {
+try {
+    if ($consentGiven) {
         require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
         $provider = new OpenAIProvenanceProvider();
         $detection = $provider->analyze($file['tmp_name'], $mime);
-    } catch (Throwable $error) {
-        // Keep provider failures generic; never expose response bodies or secrets.
-        error_log('AI Image Detector: provenance provider failed unexpectedly.');
-        $detection = [
-            'provider' => 'openai_content_provenance',
-            'status' => 'unavailable',
-            'signals' => [],
-            'error_code' => 'provider_internal_error',
-        ];
+    }
+} catch (Throwable $error) {
+    // Keep provider failures generic; never expose response bodies or secrets.
+    error_log('AI Image Detector: provenance provider failed unexpectedly.');
+    $detection = [
+        'provider' => 'openai_content_provenance',
+        'status' => 'unavailable',
+        'signals' => [],
+        'error_code' => 'provider_internal_error',
+    ];
+} finally {
+    // Explicitly remove the PHP upload temporary file after validation/analysis.
+    // PHP normally cleans it at request shutdown as well; this shortens its lifetime.
+    if (is_uploaded_file($file['tmp_name']) && !@unlink($file['tmp_name'])) {
+        error_log('AI Image Detector: temporary upload cleanup failed.');
     }
 }
 
