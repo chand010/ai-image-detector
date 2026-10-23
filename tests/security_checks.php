@@ -53,7 +53,7 @@ checkSource(
     'public/upload.php',
     [
         "hash_equals(",
-        "hash('sha256', $_SESSION['analysis_owner_token'])",
+        'hash(\'sha256\', $_SESSION[\'analysis_owner_token\'])',
         "is_uploaded_file(",
         "new finfo(FILEINFO_MIME_TYPE)",
         "'image/jpeg'",
