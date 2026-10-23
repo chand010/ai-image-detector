@@ -107,6 +107,18 @@ checkSource(
 );
 
 checkSource(
+    'Database initializer shell safety',
+    'docker/init-database.sh',
+    [
+        'CREATE INDEX idx_analyses_owner_created ON ${DB_NAME}.analyses',
+        'GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.*',
+    ],
+    [
+        '`$DB_NAME`',
+    ]
+);
+
+checkSource(
     'Database connection protections',
     'config/database.php',
     [
