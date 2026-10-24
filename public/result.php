@@ -32,7 +32,8 @@ if ($id === false || $id === null) {
         } else {
             $statement = $pdo->prepare(
                 'SELECT id, image_mime, image_width, image_height, file_size_bytes,
-                        detection_status, detection_label, confidence, created_at
+                        detection_status, detection_label, confidence, detection_provider,
+                        detection_signals_json, external_processing_consent, created_at
                  FROM analyses
                  WHERE id = :id AND owner_token_hash = :owner_hash
                  LIMIT 1'
@@ -58,6 +59,14 @@ if ($id === false || $id === null) {
 function resultEscape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+$signals = [];
+if (is_array($analysis) && is_string($analysis['detection_signals_json'] ?? null)) {
+    $decodedSignals = json_decode($analysis['detection_signals_json'], true);
+    if (is_array($decodedSignals)) {
+        $signals = $decodedSignals;
+    }
 }
 ?>
 <!doctype html>
@@ -93,12 +102,33 @@ function resultEscape(string $value): string
             </section>
 
             <section aria-labelledby="detection-heading">
-                <h2 id="detection-heading">AI-origin assessment</h2>
-                <p><strong>Not available yet.</strong> The AI detection engine has not been connected.</p>
-                <p>This result must not be interpreted as evidence that the image is human-made or AI-generated. Passing image validation only means the file was readable and in a supported format.</p>
+                <h2 id="detection-heading">AI-origin provenance assessment</h2>
+                <?php if ($analysis['detection_status'] === 'completed' && $signals !== []): ?>
+                    <p><strong>Supported provenance check completed.</strong> This checks only the supported signals below, not every possible AI generator.</p>
+                    <ul>
+                        <?php foreach ($signals as $signal): ?>
+                            <?php if (is_array($signal)): ?>
+                                <li>
+                                    <strong><?= resultEscape((string) ($signal['type'] ?? 'unknown')) ?>:</strong>
+                                    <?= resultEscape((string) ($signal['outcome'] ?? 'unknown')) ?> —
+                                    <?= resultEscape((string) ($signal['explanation'] ?? 'No explanation supplied.')) ?>
+                                </li>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php elseif ($analysis['detection_status'] === 'inconclusive'): ?>
+                    <p><strong>Inconclusive.</strong> No supported signal could be reported. This does not establish whether the image was AI-generated.</p>
+                <?php elseif ($analysis['detection_status'] === 'unavailable'): ?>
+                    <p><strong>Provenance service unavailable.</strong> No AI-origin conclusion can be drawn. The provider may be disabled, unconfigured, rate-limited, or inaccessible.</p>
+                <?php elseif ($analysis['detection_status'] === 'failed'): ?>
+                    <p><strong>Provenance check failed.</strong> No AI-origin conclusion can be drawn from this attempt.</p>
+                <?php else: ?>
+                    <p><strong>Not run.</strong> External provenance was not requested or is disabled by server configuration.</p>
+                <?php endif; ?>
+                <p>A “not detected” result means no supported signal was found. It is not proof that the image is human-made. The app does not currently use a general-purpose AI image classifier.</p>
             </section>
 
-            <p>Privacy: the application saved metadata only. It did not save the original image.</p>
+            <p>Privacy: the application saved metadata and signal outcomes only. It did not save the original image. External processing consent for this upload: <?= (int) $analysis['external_processing_consent'] === 1 ? 'yes' : 'no' ?>.</p>
         <?php endif; ?>
     </main>
 </body>

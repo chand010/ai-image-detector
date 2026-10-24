@@ -5,8 +5,8 @@ DB_NAME="${DB_NAME:-ai_image_detector}"
 DB_USER="${DB_USER:-ai_image_app}"
 : "${DB_PASSWORD:?Set DB_PASSWORD to a strong password before starting the container}"
 
-# Keep identifiers and password to a conservative character set so they can
-# safely be inserted into this SQL setup command without SQL quoting ambiguity.
+# Keep identifiers and password to a conservative character set. Identifiers
+# can therefore be inserted unquoted into the SQL statements below safely.
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid DB_NAME format." >&2; exit 1; }
 [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid DB_USER format." >&2; exit 1; }
 [[ "$DB_PASSWORD" =~ ^[A-Za-z0-9_@#%+=.-]{16,128}$ ]] || {
@@ -42,7 +42,7 @@ SET @owner_column_exists = (
 );
 SET @owner_migration = IF(
     @owner_column_exists = 0,
-    'ALTER TABLE `$DB_NAME`.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
+    'ALTER TABLE ${DB_NAME}.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
     'SELECT 1'
 );
 PREPARE owner_migration_stmt FROM @owner_migration;
@@ -57,7 +57,7 @@ SET @owner_index_exists = (
 );
 SET @owner_index_migration = IF(
     @owner_index_exists = 0,
-    'CREATE INDEX idx_analyses_owner_created ON `$DB_NAME`.analyses (owner_token_hash, created_at)',
+    'CREATE INDEX idx_analyses_owner_created ON ${DB_NAME}.analyses (owner_token_hash, created_at)',
     'SELECT 1'
 );
 PREPARE owner_index_stmt FROM @owner_index_migration;
@@ -65,11 +65,12 @@ EXECUTE owner_index_stmt;
 DEALLOCATE PREPARE owner_index_stmt;
 SQL
 
-# Create or update a dedicated, non-root account. Limit it to this database.
+# Create or update a dedicated, non-root account. The database and user
+# identifiers were validated above, so no shell command substitution is used.
 mysql --protocol=socket --user=root <<SQL
 CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
 ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-GRANT SELECT, INSERT, UPDATE ON `$DB_NAME`.* TO '$DB_USER'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.* TO '$DB_USER'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 

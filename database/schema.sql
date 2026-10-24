@@ -18,10 +18,15 @@ CREATE TABLE IF NOT EXISTS analyses (
     detection_status ENUM(
         'not_configured',
         'completed',
+        'inconclusive',
+        'unavailable',
         'failed'
     ) NOT NULL DEFAULT 'not_configured',
     detection_label VARCHAR(64) NULL,
     confidence DECIMAL(5,4) NULL,
+    detection_provider VARCHAR(64) NULL,
+    detection_signals_json JSON NULL,
+    external_processing_consent TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     INDEX idx_analyses_created_at (created_at),
