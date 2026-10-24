@@ -63,6 +63,30 @@ $unknownSignal = OpenAIProvenanceResponseMapper::map([
 assertSameValue('completed', $unknownSignal['status'], 'unknown future signal is ignored while known result is retained');
 assertSameValue(1, count($unknownSignal['signals']), 'unknown signal is not exposed as evidence');
 
+$positiveWithMissingState = OpenAIProvenanceResponseMapper::map([
+    'object' => 'content_provenance_check',
+    'results' => [
+        ['type' => 'c2pa', 'outcome' => 'detected'],
+    ],
+]);
+assertSameValue('failed', $positiveWithMissingState['status'], 'positive C2PA result without validation state fails safely');
+assertSameValue([], $positiveWithMissingState['signals'], 'missing validation state cannot be exposed as evidence');
+
+$positiveWithAbsentManifest = OpenAIProvenanceResponseMapper::map([
+    'object' => 'content_provenance_check',
+    'results' => [
+        ['type' => 'c2pa', 'outcome' => 'detected', 'validation_state' => 'not_present'],
+    ],
+]);
+assertSameValue('failed', $positiveWithAbsentManifest['status'], 'positive C2PA result with not_present state is rejected');
+
+$nonArrayResult = OpenAIProvenanceResponseMapper::map([
+    'object' => 'content_provenance_check',
+    'results' => ['unexpected-string'],
+]);
+assertSameValue('failed', $nonArrayResult['status'], 'non-object result entries fail safely');
+assertSameValue([], $nonArrayResult['signals'], 'malformed entries do not leak partial signals');
+
 $invalidManifest = OpenAIProvenanceResponseMapper::map([
     'object' => 'content_provenance_check',
     'results' => [
