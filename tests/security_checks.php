@@ -3,9 +3,7 @@ declare(strict_types=1);
 
 /**
  * Lightweight regression checks for security controls in the current prototype.
- *
- * These are source-level checks, not a substitute for HTTP integration tests,
- * penetration testing, or review of runtime configuration.
+ * These source-level checks are not a substitute for runtime testing or review.
  */
 
 $root = dirname(__DIR__);
@@ -39,7 +37,7 @@ function checkSource(string $name, string $path, array $needles, array $forbidde
 }
 
 checkSource(
-    'Upload protections',
+    'Upload protections and local detector wiring',
     'public/upload.php',
     [
         'hash_equals(',
@@ -59,7 +57,8 @@ checkSource(
         'temporary upload cleanup failed.',
         '$pdo->prepare(',
         'header(\'Location: /result.php?id=\' . $analysisId, true, 303)',
-        "error_log('AI Image Detector: metadata save failed.')",
+        'metadata save failed (type=%s, sqlstate=%s)',
+        'SmaugLocalClassifier.php',
     ],
     [
         'move_uploaded_file(',
@@ -107,14 +106,13 @@ checkSource(
 );
 
 checkSource(
-    'Database initializer shell safety',
+    'Database initializer migrations',
     'docker/init-database.sh',
     [
-        'CREATE INDEX idx_analyses_owner_created ON ${DB_NAME}.analyses',
-        'GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.*',
-    ],
-    [
-        '`$DB_NAME`',
+        'ensure_column detection_signals_json "JSON NULL"',
+        'ensure_column external_processing_consent "TINYINT(1) NOT NULL DEFAULT 0"',
+        "'not_configured','completed','inconclusive','unavailable','failed'",
+        'GRANT SELECT, INSERT, UPDATE ON $DB_NAME.*',
     ]
 );
 
@@ -125,34 +123,48 @@ checkSource(
         'PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION',
         'PDO::ATTR_EMULATE_PREPARES => false',
         "getenv('DB_PASSWORD')",
+        "getenv('DB_USER') ?: 'ai_image_app'",
     ],
     [
         'DB_PASSWORD=replace-with-a-long-random-password',
     ]
 );
 
-
 checkSource(
-    'Classifier provider safeguards',
-    'src/Detection/HuggingFaceImageClassifier.php',
+    'Local classifier safeguards',
+    'src/Detection/SmaugLocalClassifier.php',
     [
-        'ENABLE_EXTERNAL_CLASSIFIER',
-        "getenv('HF_TOKEN')",
-        'https://router.huggingface.co/hf-inference/models/',
-        'CURLOPT_FOLLOWLOCATION => false',
-        'CURLOPT_SSL_VERIFYPEER => true',
-        'CURLOPT_TIMEOUT => 30',
-        "type' => 'ai_image_classifier'",
-        'classifier_labels_unrecognized',
+        'ENABLE_LOCAL_CLASSIFIER',
+        'proc_open(',
+        "'bypass_shell' => true",
+        'SMAUG_TIMEOUT_SECONDS',
+        'local_inference_timeout',
+        'MAX_IMAGE_BYTES',
     ],
     [
-        'file_put_contents(',
-        'move_uploaded_file(',
+        'shell_exec(',
+        'system(',
     ]
 );
 
 checkSource(
-    'Frontend assets and consent notice',
+    'Python inference helper privacy and score validation',
+    'scripts/smaug_detect.py',
+    [
+        'abacusai/Smaug-AI-Image-Detector',
+        'snapshot_download(',
+        'normalize_score(',
+        'model_score_out_of_range',
+        'local_model_load_or_inference_failed',
+    ],
+    [
+        'requests.post(',
+        'file.write(',
+    ]
+);
+
+checkSource(
+    'Frontend local processing and external consent',
     'public/index.php',
     [
         '/assets/app.css',
@@ -160,6 +172,7 @@ checkSource(
         'external_processing_consent',
         'deleted after analysis',
         'data-image-preview',
+        'The local Smaug classifier runs without this permission.',
     ]
 );
 
