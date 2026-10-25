@@ -21,7 +21,7 @@ function respond(int $status, string $message): never
     http_response_code($status);
     header('Content-Type: text/html; charset=UTF-8');
     $safeMessage = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Upload result</title><body><main><h1>Upload result</h1><p>' . $safeMessage . '</p><p><a href="/">Back</a></p></main></body></html>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Upload result — AI Image Detector</title><link rel="stylesheet" href="/assets/app.css"></head><body><div class="site-shell"><header class="site-header"><a class="brand" href="/"><span class="brand-mark">AI</span><span>IMAGE INTELLIGENCE</span></a></header><main><section class="result-hero"><div><span class="eyebrow">Upload notice</span><h1>We could not <span class="accent-text">continue.</span></h1></div></section><div class="error-box" role="alert">' . $safeMessage . '</div><p style="margin-top:24px"><a class="btn btn-secondary" href="/" style="max-width:220px">Back to upload</a></p></main></div></body></html>';
     exit;
 }
 
@@ -100,13 +100,90 @@ if ($decoded === false) {
 }
 imagedestroy($decoded);
 
-// Save only validated metadata. The uploaded image itself is never stored.
+$consentGiven = ($_POST['external_processing_consent'] ?? null) === 'yes';
+$detection = [
+    'provider' => 'smaug_local',
+    'status' => 'unavailable',
+    'label' => null,
+    'confidence' => null,
+    'signals' => [],
+    'error_code' => 'local_classifier_not_started',
+];
+
+try {
+    // Primary detection always runs locally; it does not require consent to
+    // send the image to a third party and does not need an API token.
+    require_once __DIR__ . '/../src/Detection/SmaugLocalClassifier.php';
+    $classifier = new SmaugLocalClassifier();
+    $detection = $classifier->analyze($file['tmp_name'], $mime);
+} catch (Throwable $error) {
+    error_log('AI Image Detector: local classifier failed unexpectedly.');
+    $detection = [
+        'provider' => 'smaug_local',
+        'status' => 'unavailable',
+        'label' => null,
+        'confidence' => null,
+        'signals' => [],
+        'error_code' => 'local_classifier_internal_error',
+    ];
+}
+
+if ($consentGiven) {
+    try {
+        // The optional provenance provider receives the image only after the
+        // user opts in and the server-side feature flag/API key are configured.
+        require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
+        $provenanceProvider = new OpenAIProvenanceProvider();
+        $provenance = $provenanceProvider->analyze($file['tmp_name'], $mime);
+
+        if (is_array($provenance['signals'] ?? null)) {
+            $detection['signals'] = array_merge($detection['signals'] ?? [], $provenance['signals']);
+        }
+
+        if (($detection['status'] ?? null) !== 'completed' &&
+            ($provenance['status'] ?? null) === 'completed') {
+            $detection['provider'] = $provenance['provider'] ?? 'openai_content_provenance';
+            $detection['status'] = 'completed';
+            $detection['label'] = null;
+            $detection['confidence'] = null;
+            $detection['error_code'] = null;
+        } elseif (($detection['status'] ?? null) !== 'completed' &&
+            ($provenance['status'] ?? null) === 'inconclusive' &&
+            ($detection['status'] ?? null) === 'unavailable') {
+            $detection['status'] = 'inconclusive';
+            $detection['error_code'] = null;
+        }
+    } catch (Throwable $error) {
+        // Do not let an optional provider failure discard a local result.
+        error_log('AI Image Detector: optional provenance provider failed.');
+    }
+} else {
+    $detection['signals'] = is_array($detection['signals'] ?? null) ? $detection['signals'] : [];
+}
+
+try {
+    // The original upload is not copied to application storage or MySQL.
+    // Delete it before attempting database persistence.
+    if (is_uploaded_file($file['tmp_name']) && !@unlink($file['tmp_name'])) {
+        error_log('AI Image Detector: temporary upload cleanup failed.');
+    }
+} catch (Throwable $error) {
+    error_log('AI Image Detector: temporary upload cleanup raised an error.');
+}
+
+$signalsJson = json_encode($detection['signals'] ?? [], JSON_THROW_ON_ERROR);
+
 try {
     require_once __DIR__ . '/../config/database.php';
     $pdo = createDatabaseConnection();
     $statement = $pdo->prepare(
-        'INSERT INTO analyses (owner_token_hash, image_mime, image_width, image_height, file_size_bytes, detection_status)
-         VALUES (:owner_hash, :mime, :width, :height, :file_size, :status)'
+        'INSERT INTO analyses
+            (owner_token_hash, image_mime, image_width, image_height, file_size_bytes,
+             detection_status, detection_label, confidence, detection_provider,
+             detection_error_code, detection_signals_json, external_processing_consent)
+         VALUES
+            (:owner_hash, :mime, :width, :height, :file_size,
+             :status, :label, :confidence, :provider, :error_code, :signals, :consent)'
     );
     $statement->execute([
         'owner_hash' => hash('sha256', $_SESSION['analysis_owner_token']),
@@ -114,13 +191,33 @@ try {
         'width' => $width,
         'height' => $height,
         'file_size' => $file['size'],
-        'status' => 'not_configured',
+        'status' => in_array($detection['status'] ?? null,
+            ['not_configured', 'completed', 'inconclusive', 'unavailable', 'failed'], true)
+                ? $detection['status'] : 'unavailable',
+        'label' => $detection['label'] ?? null,
+        'confidence' => isset($detection['confidence']) && is_numeric($detection['confidence'])
+            ? max(0.0, min(1.0, (float) $detection['confidence']))
+            : null,
+        'provider' => is_string($detection['provider'] ?? null) ? $detection['provider'] : null,
+        'error_code' => is_string($detection['error_code'] ?? null) &&
+            preg_match('/^[a-z0-9_]{1,64}$/', $detection['error_code']) === 1
+                ? $detection['error_code'] : null,
+        'signals' => $signalsJson,
+        'consent' => $consentGiven ? 1 : 0,
     ]);
     $analysisId = (int) $pdo->lastInsertId();
 } catch (Throwable $exception) {
-    // Log only a generic event; do not expose database details to visitors.
-    error_log('AI Image Detector: metadata save failed.');
-    respond(503, 'The image passed validation, but the result could not be saved. Please try again later.');
+    // Log diagnostic class/state for operators without exposing SQL, paths,
+    // uploaded content, exception messages, or credentials to visitors.
+    $sqlState = $exception instanceof PDOException
+        ? (string) ($exception->errorInfo[0] ?? $exception->getCode())
+        : (string) $exception->getCode();
+    error_log(sprintf(
+        'AI Image Detector: metadata save failed (type=%s, sqlstate=%s).',
+        get_class($exception),
+        preg_match('/^[A-Z0-9]{5}$/', $sqlState) === 1 ? $sqlState : 'unknown'
+    ));
+    respond(503, 'The image was analyzed, but the result could not be saved. Please check the application logs and try again.');
 }
 
 header('Location: /result.php?id=' . $analysisId, true, 303);

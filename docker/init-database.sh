@@ -5,8 +5,7 @@ DB_NAME="${DB_NAME:-ai_image_detector}"
 DB_USER="${DB_USER:-ai_image_app}"
 : "${DB_PASSWORD:?Set DB_PASSWORD to a strong password before starting the container}"
 
-# Keep identifiers and password to a conservative character set so they can
-# safely be inserted into this SQL setup command without SQL quoting ambiguity.
+# Validate identifiers before inserting them into SQL statements.
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid DB_NAME format." >&2; exit 1; }
 [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid DB_USER format." >&2; exit 1; }
 [[ "$DB_PASSWORD" =~ ^[A-Za-z0-9_@#%+=.-]{16,128}$ ]] || {
@@ -14,7 +13,6 @@ DB_USER="${DB_USER:-ai_image_app}"
     exit 1
 }
 
-# Wait for the MySQL server process to accept local socket connections.
 for attempt in $(seq 1 60); do
     if mysqladmin --protocol=socket --user=root ping --silent >/dev/null 2>&1; then
         break
@@ -26,50 +24,73 @@ for attempt in $(seq 1 60); do
     sleep 2
 done
 
-# The schema file uses the default database name. Identifiers are validated
-# above, so substitute the configured name before applying the schema.
+# Create any missing tables, then migrate columns on an existing persistent
+# volume. CREATE TABLE IF NOT EXISTS does not update existing table schemas.
 sed "s/ai_image_detector/$DB_NAME/g" /var/www/html/database/schema.sql |
     mysql --protocol=socket --user=root
 
-# Add session ownership to databases created by earlier versions.
-# Existing rows remain unowned and cannot be viewed by new browser sessions.
-mysql --protocol=socket --user=root <<SQL
-SET @owner_column_exists = (
-    SELECT COUNT(*) FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = '$DB_NAME'
-      AND TABLE_NAME = 'analyses'
-      AND COLUMN_NAME = 'owner_token_hash'
-);
-SET @owner_migration = IF(
-    @owner_column_exists = 0,
-    'ALTER TABLE `$DB_NAME`.analyses ADD COLUMN owner_token_hash CHAR(64) NULL AFTER id',
-    'SELECT 1'
-);
-PREPARE owner_migration_stmt FROM @owner_migration;
-EXECUTE owner_migration_stmt;
-DEALLOCATE PREPARE owner_migration_stmt;
+column_exists() {
+    local column_name="$1"
+    mysql --protocol=socket --user=root --batch --skip-column-names -e \
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = '$DB_NAME'
+           AND TABLE_NAME = 'analyses'
+           AND COLUMN_NAME = '$column_name'"
+}
 
-SET @owner_index_exists = (
-    SELECT COUNT(*) FROM information_schema.STATISTICS
-    WHERE TABLE_SCHEMA = '$DB_NAME'
-      AND TABLE_NAME = 'analyses'
-      AND INDEX_NAME = 'idx_analyses_owner_created'
-);
-SET @owner_index_migration = IF(
-    @owner_index_exists = 0,
-    'CREATE INDEX idx_analyses_owner_created ON `$DB_NAME`.analyses (owner_token_hash, created_at)',
-    'SELECT 1'
-);
-PREPARE owner_index_stmt FROM @owner_index_migration;
-EXECUTE owner_index_stmt;
-DEALLOCATE PREPARE owner_index_stmt;
-SQL
+ensure_column() {
+    local column_name="$1"
+    local column_definition="$2"
+    if [[ "$(column_exists "$column_name")" == "0" ]]; then
+        mysql --protocol=socket --user=root -e \
+            "ALTER TABLE $DB_NAME.analyses ADD COLUMN $column_name $column_definition"
+        echo "Added missing analyses.$column_name column."
+    fi
+}
 
-# Create or update a dedicated, non-root account. Limit it to this database.
+ensure_column owner_token_hash "CHAR(64) NULL"
+ensure_column detection_label "VARCHAR(64) NULL"
+ensure_column confidence "DECIMAL(5,4) NULL"
+ensure_column detection_provider "VARCHAR(64) NULL"
+ensure_column detection_error_code "VARCHAR(64) NULL"
+ensure_column detection_signals_json "JSON NULL"
+ensure_column external_processing_consent "TINYINT(1) NOT NULL DEFAULT 0"
+
+# Older volumes may have an ENUM that rejects newer inconclusive/unavailable
+# results. Update it before PHP attempts to save detector output.
+status_type="$(mysql --protocol=socket --user=root --batch --skip-column-names -e \
+    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = '$DB_NAME'
+       AND TABLE_NAME = 'analyses'
+       AND COLUMN_NAME = 'detection_status'")"
+if [[ -z "$status_type" ]]; then
+    mysql --protocol=socket --user=root -e \
+        "ALTER TABLE $DB_NAME.analyses
+         ADD COLUMN detection_status ENUM('not_configured','completed','inconclusive','unavailable','failed')
+         NOT NULL DEFAULT 'not_configured'"
+elif [[ "$status_type" != *"'inconclusive'"* || "$status_type" != *"'unavailable'"* ]]; then
+    mysql --protocol=socket --user=root -e \
+        "ALTER TABLE $DB_NAME.analyses
+         MODIFY COLUMN detection_status ENUM('not_configured','completed','inconclusive','unavailable','failed')
+         NOT NULL DEFAULT 'not_configured'"
+    echo "Migrated analyses.detection_status to support all result states."
+fi
+
+index_exists="$(mysql --protocol=socket --user=root --batch --skip-column-names -e \
+    "SELECT COUNT(*) FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = '$DB_NAME'
+       AND TABLE_NAME = 'analyses'
+       AND INDEX_NAME = 'idx_analyses_owner_created'")"
+if [[ "$index_exists" == "0" ]]; then
+    mysql --protocol=socket --user=root -e \
+        "CREATE INDEX idx_analyses_owner_created ON $DB_NAME.analyses (owner_token_hash, created_at)"
+fi
+
+# Use a dedicated non-root account with only the app's required privileges.
 mysql --protocol=socket --user=root <<SQL
 CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
 ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-GRANT SELECT, INSERT, UPDATE ON `$DB_NAME`.* TO '$DB_USER'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE ON $DB_NAME.* TO '$DB_USER'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 

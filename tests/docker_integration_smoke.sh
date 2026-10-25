@@ -25,6 +25,10 @@ trap cleanup EXIT
 
 fail() {
     echo "FAIL: $*" >&2
+    # Preserve container diagnostics for every failure, not only startup failures.
+    if [[ "$SERVER_STARTED" == 1 ]]; then
+        docker logs "$CONTAINER_NAME" >"$SERVER_LOG" 2>&1 || true
+    fi
     if [[ -s "$SERVER_LOG" ]]; then
         echo "--- Docker container logs ---" >&2
         cat "$SERVER_LOG" >&2
@@ -41,24 +45,66 @@ docker run -d --name "$CONTAINER_NAME" \
     -e DB_NAME=ai_image_detector \
     -e DB_USER=ai_image_app \
     -e "DB_PASSWORD=$DB_PASSWORD" \
+    -e ENABLE_LOCAL_CLASSIFIER=false \
     "$IMAGE_TAG" >/dev/null
 SERVER_STARTED=1
 
-ready=0
+http_ready=0
 for _ in $(seq 1 90); do
     if curl --silent --show-error --max-time 2 -c "$COOKIE_JAR" "$BASE_URL/" -o "$BODY" 2>/dev/null; then
-        ready=1
+        http_ready=1
         break
     fi
     sleep 2
 done
-if [[ "$ready" != 1 ]]; then
-    docker logs "$CONTAINER_NAME" >"$SERVER_LOG" 2>&1 || true
-    fail "Container did not serve the upload page within 180 seconds"
-fi
+[[ "$http_ready" == 1 ]] || fail "Container did not serve the upload page within 180 seconds"
 
+# Apache can serve the form before the one-shot DB initializer finishes.
+# Wait for the restricted app account to query the actual schema over TCP.
+db_ready=0
+for _ in $(seq 1 60); do
+    if docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
+        mysql --protocol=tcp --host=127.0.0.1 --user=ai_image_app \
+        --batch --skip-column-names \
+        -e "SELECT 1 FROM ai_image_detector.analyses LIMIT 0;" >/dev/null 2>&1; then
+        db_ready=1
+        break
+    fi
+    sleep 2
+done
+[[ "$db_ready" == 1 ]] || fail "Application database account/schema did not become ready within 120 seconds"
+
+# Simulate an older persistent volume whose ENUM does not allow unavailable
+# or inconclusive results. A container restart must migrate it before uploads.
+docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root -e \
+    "ALTER TABLE ai_image_detector.analyses MODIFY COLUMN detection_status ENUM('not_configured','completed','failed') NOT NULL DEFAULT 'not_configured';"
+docker restart "$CONTAINER_NAME" >/dev/null
+
+db_ready=0
+STATUS_ENUM=""
+for _ in $(seq 1 60); do
+    # MySQL may accept connections before the one-shot migration finishes.
+    STATUS_ENUM="$(docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root --batch --skip-column-names -e \
+        "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='ai_image_detector' AND TABLE_NAME='analyses' AND COLUMN_NAME='detection_status'" 2>/dev/null || true)"
+    if [[ "$STATUS_ENUM" == *"'unavailable'"* && "$STATUS_ENUM" == *"'inconclusive'"* ]] && \
+       docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
+        mysql --protocol=tcp --host=127.0.0.1 --user=ai_image_app \
+        --batch --skip-column-names \
+        -e "SELECT 1 FROM ai_image_detector.analyses LIMIT 0;" >/dev/null 2>&1; then
+        db_ready=1
+        break
+    fi
+    sleep 2
+done
+[[ "$db_ready" == 1 ]] || fail "Database did not recover with migrated detection-status enum"
+[[ "$STATUS_ENUM" == *"'unavailable'"* && "$STATUS_ENUM" == *"'inconclusive'"* ]] || fail "Startup did not migrate detection_status enum"
+echo "PASS: startup migrated legacy detection-status enum"
+
+# Re-fetch the CSRF token after restart because PHP sessions may have been reset.
+curl --silent --show-error --max-time 15 -c "$COOKIE_JAR" "$BASE_URL/" -o "$BODY" || fail "Could not reload upload page after database migration"
 grep -q 'name="csrf_token"' "$BODY" || fail "Upload page is missing the CSRF token field"
 echo "PASS: Docker container serves upload form"
+echo "PASS: MySQL schema is ready for the restricted application account"
 
 # A tiny 1x1 PNG used only as a disposable test fixture.
 base64 -d > "$PNG_FILE" <<'PNG'
@@ -86,12 +132,12 @@ echo "PASS: Valid image upload returned HTTP 303"
 LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {gsub("\\r",""); print $2}' "$HEADERS" | tail -n1)"
 [[ "$LOCATION" =~ ^/result\.php\?id=[1-9][0-9]*$ ]] || fail "Upload redirect did not contain a valid result reference"
 
-curl --silent --show-error --max-time 15 "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
-grep -q 'AI detection engine has not been connected' "$BODY" || fail "Result page did not explain that detection is not configured"
-grep -q 'Image validation' "$BODY" || fail "Result page did not show image validation"
+curl --silent --show-error --max-time 15 -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE_URL$LOCATION" -o "$BODY" || fail "Could not fetch result page"
+grep -q 'Engine unavailable' "$BODY" || fail "Result page did not show the disabled detector status"
+grep -q 'Validated image' "$BODY" || fail "Result page did not show validated image details"
 echo "PASS: Result page displays saved record and honest detection status"
 
-curl --silent --show-error --max-time 15 "$BASE_URL/history.php" -o "$BODY" || fail "Could not fetch history page"
+curl --silent --show-error --max-time 15 -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE_URL/history.php" -o "$BODY" || fail "Could not fetch history page"
 grep -q 'image/png' "$BODY" || fail "History page did not include the uploaded PNG metadata"
 echo "PASS: History page includes saved image metadata"
 

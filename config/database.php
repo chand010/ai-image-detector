@@ -4,21 +4,16 @@ declare(strict_types=1);
 /**
  * Create a PDO connection using environment variables.
  *
- * Required environment variables:
- *   DB_HOST (defaults to 127.0.0.1)
- *   DB_PORT (defaults to 3306)
- *   DB_NAME (defaults to ai_image_detector)
- *   DB_USER
- *   DB_PASSWORD
- *
- * Never commit real database credentials to Git.
+ * DB_HOST, DB_PORT and DB_NAME have local defaults. DB_USER defaults to the
+ * same restricted account created by docker/init-database.sh. DB_PASSWORD
+ * must be configured at container startup and must never be committed.
  */
 function createDatabaseConnection(): PDO
 {
     $host = getenv('DB_HOST') ?: '127.0.0.1';
     $port = getenv('DB_PORT') ?: '3306';
     $database = getenv('DB_NAME') ?: 'ai_image_detector';
-    $username = getenv('DB_USER');
+    $username = getenv('DB_USER') ?: 'ai_image_app';
     $password = getenv('DB_PASSWORD');
 
     if (!is_string($username) || $username === '' ||

@@ -54,6 +54,14 @@ final class OpenAIProvenanceResponseMapper
                     return $base;
                 }
 
+                // The API only reports a positive C2PA outcome for trusted/valid
+                // OpenAI-issued AI-generation credentials. Never surface a
+                // contradictory positive result as usable provenance evidence.
+                if ($outcome === 'detected' &&
+                    !in_array($validationState, ['trusted', 'valid'], true)) {
+                    return $base;
+                }
+
                 $explanation = match (true) {
                     $outcome === 'detected' && in_array($validationState, ['trusted', 'valid'], true)
                         => 'Supported OpenAI-issued AI-generation credentials were detected.',

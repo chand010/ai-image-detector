@@ -13,5 +13,11 @@ private-uploads/
 storage/
 vendor/
 node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
 .DS_Store
 Thumbs.db

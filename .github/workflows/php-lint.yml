@@ -1,4 +1,4 @@
-name: PHP Tests
+name: PHP and local detector tests
 
 on:
   push:
@@ -20,6 +20,10 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Lint PHP files
         shell: bash
         run: |
@@ -33,12 +37,28 @@ jobs:
             echo "Checking $file"
             php -l "$file"
           done
+      - name: Lint shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            bash -n "$file"
+          done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+      - name: Compile Python helper and run score-mapping tests
+        run: |
+          python -m py_compile scripts/smaug_detect.py tests/test_smaug_detector.py
+          python tests/test_smaug_detector.py
       - name: Run source-level security checks
         run: php tests/security_checks.php
       - name: Run offline provenance response mapper tests
         run: php tests/provenance_response_mapper.php
       - name: Run disabled external provider test
         run: php tests/provenance_provider_disabled.php
+      - name: Run disabled hosted classifier test
+        run: php tests/classifier_provider_disabled.php
+      - name: Run disabled local detector test
+        run: php tests/local_classifier_disabled.php
       - name: Run HTTP security smoke tests
         run: bash tests/http_security_smoke.sh
       - name: Run Docker and MySQL integration smoke test
