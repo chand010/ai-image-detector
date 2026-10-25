@@ -105,19 +105,21 @@ def main(argv: list[str]) -> int:
                 print(json.dumps(result("failed", error_code="image_dimensions_invalid")))
                 return 0
             image.verify()
-        with Image.open(image_path) as image:
-            image = image.convert("RGB")
-            detector = load_detector()
-            try:
-                import torch
-                threads = os.environ.get("SMAUG_NUM_THREADS", "4")
-                torch.set_num_threads(max(1, min(8, int(threads))))
-            except (ImportError, ValueError):
-                pass
-            raw_score = detector(image)
-            normalized = normalize_score(raw_score)
-            print(json.dumps(normalized, separators=(",", ":"), allow_nan=False))
-            return 0
+        # Match the model card's documented single-image API exactly:
+        # detector("photo.jpg") -> AI-generation probability. Passing a PIL
+        # object happens to be supported in batches, but is not the documented
+        # single-image call and can break custom preprocessing implementations.
+        detector = load_detector()
+        try:
+            import torch
+            threads = os.environ.get("SMAUG_NUM_THREADS", "4")
+            torch.set_num_threads(max(1, min(8, int(threads))))
+        except (ImportError, ValueError):
+            pass
+        raw_score = detector(str(image_path))
+        normalized = normalize_score(raw_score)
+        print(json.dumps(normalized, separators=(",", ":"), allow_nan=False))
+        return 0
     except Exception as exc:  # safe boundary: don't print paths or provider internals
         print(f"Smaug local inference failed ({type(exc).__name__}).", file=sys.stderr)
         print(json.dumps(result("unavailable", error_code="local_model_load_or_inference_failed")))
