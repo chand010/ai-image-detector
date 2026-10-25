@@ -52,6 +52,7 @@ ensure_column owner_token_hash "CHAR(64) NULL"
 ensure_column detection_label "VARCHAR(64) NULL"
 ensure_column confidence "DECIMAL(5,4) NULL"
 ensure_column detection_provider "VARCHAR(64) NULL"
+ensure_column detection_error_code "VARCHAR(64) NULL"
 ensure_column detection_signals_json "JSON NULL"
 ensure_column external_processing_consent "TINYINT(1) NOT NULL DEFAULT 0"
 
