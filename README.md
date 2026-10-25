@@ -30,7 +30,7 @@ Result interpretation:
 
 The displayed score is the model's reported score, **not a calibrated guarantee**. Model performance varies with generator, image editing, screenshots, compression, and data distribution. A score must not be the sole basis for decisions about a person, a claim, or a piece of work.
 
-Model license shown on the model card: Apache-2.0. Review the model card and repository revision before production deployment. Because the model repository includes the Python helper that loads the weights, set SMAUG_MODEL_REVISION to a reviewed immutable commit SHA before production use; leaving it blank follows the repository's current default revision.
+Model license shown on the model card: Apache-2.0. Review the model card and repository revision before production deployment. Because the model repository includes the Python helper that loads the weights, the container pins SMAUG_MODEL_REVISION to reviewed commit c7c95951e04a87b884a4ad479401b1128c3903bd. Keep this pin unless a newer model revision has been reviewed and tested.
 
 ## Build and run
 
@@ -120,7 +120,7 @@ docker exec ai-image-detector /opt/ai-detector-venv/bin/python --version
 | DB_PASSWORD | Required DB password | No default |
 | ENABLE_LOCAL_CLASSIFIER | Enable local inference | true in Docker image |
 | SMAUG_MODEL_ID | Model repository ID | abacusai/Smaug-AI-Image-Detector |
-| SMAUG_MODEL_REVISION | Optional immutable model commit | Blank; set a reviewed commit for production |
+| SMAUG_MODEL_REVISION | Immutable model commit | c7c95951e04a87b884a4ad479401b1128c3903bd |
 | SMAUG_NUM_THREADS | CPU inference threads | 4 |
 | SMAUG_TIMEOUT_SECONDS | Maximum helper runtime | 300 seconds |
 | HF_HOME | Model artifact cache | /var/cache/huggingface |
