@@ -53,8 +53,8 @@ checkSource(
         '$maxPixels = 20_000_000;',
         'imagecreatefromstring(',
         '$consentGiven = ($_POST[\'external_processing_consent\'] ?? null) === \'yes\';',
-        '$provider->analyze($file[\'tmp_name\'], $mime)',
-        'ENABLE_EXTERNAL_PROVENANCE',
+        '$classifier->analyze($file[\'tmp_name\'], $mime)',
+        '$provenanceProvider->analyze($file[\'tmp_name\'], $mime)',
         '@unlink($file[\'tmp_name\'])',
         'temporary upload cleanup failed.',
         '$pdo->prepare(',
@@ -87,9 +87,9 @@ checkSource(
         'FILTER_VALIDATE_INT',
         'owner_token_hash = :owner_hash',
         'htmlspecialchars(',
-        'did not save the original image',
+        'did not intentionally retain the original image',
         'external_processing_consent',
-        'A “not detected” result means no supported signal was found.',
+        'No provenance or classifier signals were returned for this scan.',
     ]
 );
 
@@ -128,6 +128,38 @@ checkSource(
     ],
     [
         'DB_PASSWORD=replace-with-a-long-random-password',
+    ]
+);
+
+
+checkSource(
+    'Classifier provider safeguards',
+    'src/Detection/HuggingFaceImageClassifier.php',
+    [
+        'ENABLE_EXTERNAL_CLASSIFIER',
+        "getenv('HF_TOKEN')",
+        'https://router.huggingface.co/hf-inference/models/',
+        'CURLOPT_FOLLOWLOCATION => false',
+        'CURLOPT_SSL_VERIFYPEER => true',
+        'CURLOPT_TIMEOUT => 30',
+        "type' => 'ai_image_classifier'",
+        'classifier_labels_unrecognized',
+    ],
+    [
+        'file_put_contents(',
+        'move_uploaded_file(',
+    ]
+);
+
+checkSource(
+    'Frontend assets and consent notice',
+    'public/index.php',
+    [
+        '/assets/app.css',
+        '/assets/app.js',
+        'external_processing_consent',
+        'temporary and deleted after analysis',
+        'data-image-preview',
     ]
 );
 
