@@ -100,31 +100,53 @@ if ($decoded === false) {
 }
 imagedestroy($decoded);
 
-// The provider is called only after validation and explicit per-upload consent.
-// The provider itself also requires ENABLE_EXTERNAL_PROVENANCE=true.
+// External providers are never called without explicit per-upload consent.
 $consentGiven = ($_POST['external_processing_consent'] ?? null) === 'yes';
 $detection = [
     'provider' => null,
     'status' => 'not_configured',
+    'label' => null,
+    'confidence' => null,
     'signals' => [],
     'error_code' => null,
 ];
 
 try {
     if ($consentGiven) {
+        require_once __DIR__ . '/../src/Detection/HuggingFaceImageClassifier.php';
+        $classifier = new HuggingFaceImageClassifier();
+        $classification = $classifier->analyze($file['tmp_name'], $mime);
+        $detection = $classification;
+
+        // Provenance is complementary evidence, not a replacement for classification.
         require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
-        $provider = new OpenAIProvenanceProvider();
-        $detection = $provider->analyze($file['tmp_name'], $mime);
+        $provenanceProvider = new OpenAIProvenanceProvider();
+        $provenance = $provenanceProvider->analyze($file['tmp_name'], $mime);
+
+        if (is_array($provenance['signals'] ?? null)) {
+            $detection['signals'] = array_merge($detection['signals'], $provenance['signals']);
+        }
+
+        // Prefer the classifier's result when available; otherwise preserve a completed provenance check.
+        if (($classification['status'] ?? null) !== 'completed' &&
+            ($provenance['status'] ?? null) === 'completed') {
+            $detection['status'] = 'completed';
+            $detection['provider'] = $provenance['provider'] ?? 'openai_content_provenance';
+            $detection['label'] = null;
+            $detection['confidence'] = null;
+        } elseif (($classification['status'] ?? null) !== 'completed' &&
+            ($provenance['status'] ?? null) === 'inconclusive' &&
+            ($detection['status'] ?? null) === 'not_configured') {
+            $detection['status'] = 'inconclusive';
+        }
     }
 } catch (Throwable $error) {
     // Keep provider failures generic; never expose response bodies or secrets.
-    error_log('AI Image Detector: provenance provider failed unexpectedly.');
-    $detection = [
-        'provider' => 'openai_content_provenance',
-        'status' => 'unavailable',
-        'signals' => [],
-        'error_code' => 'provider_internal_error',
-    ];
+    error_log('AI Image Detector: analysis provider failed unexpectedly.');
+    if (($detection['status'] ?? null) !== 'completed') {
+        $detection['status'] = 'unavailable';
+        $detection['error_code'] = 'analysis_provider_internal_error';
+    }
 } finally {
     // Explicitly remove the PHP upload temporary file after validation/analysis.
     // PHP normally cleans it at request shutdown as well; this shortens its lifetime.
@@ -141,10 +163,11 @@ try {
     $statement = $pdo->prepare(
         'INSERT INTO analyses
             (owner_token_hash, image_mime, image_width, image_height, file_size_bytes,
-             detection_status, detection_provider, detection_signals_json, external_processing_consent)
+             detection_status, detection_label, confidence, detection_provider,
+             detection_signals_json, external_processing_consent)
          VALUES
             (:owner_hash, :mime, :width, :height, :file_size,
-             :status, :provider, :signals, :consent)'
+             :status, :label, :confidence, :provider, :signals, :consent)'
     );
     $statement->execute([
         'owner_hash' => hash('sha256', $_SESSION['analysis_owner_token']),
@@ -153,6 +176,10 @@ try {
         'height' => $height,
         'file_size' => $file['size'],
         'status' => $detection['status'],
+        'label' => $detection['label'] ?? null,
+        'confidence' => isset($detection['confidence']) && is_numeric($detection['confidence'])
+            ? max(0.0, min(1.0, (float) $detection['confidence']))
+            : null,
         'provider' => $detection['provider'],
         'signals' => $signalsJson,
         'consent' => $consentGiven ? 1 : 0,
