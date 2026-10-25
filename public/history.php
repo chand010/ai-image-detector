@@ -53,55 +53,92 @@ function formatBytes(int $bytes): string
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#090b0a">
     <title>Analysis History — AI Image Detector</title>
+    <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
-    <main>
-        <h1>Analysis History</h1>
-        <p><a href="/">Return to image upload</a></p>
-        <p>Showing up to 50 analysis records from this browser session. Other sessions cannot view these records. Original image files are not stored.</p>
+    <div class="site-shell">
+        <header class="site-header">
+            <a class="brand" href="/" aria-label="AI Image Detector home">
+                <span class="brand-mark" aria-hidden="true">AI</span>
+                <span>IMAGE INTELLIGENCE</span>
+            </a>
+            <nav class="nav-links" aria-label="Main navigation">
+                <a href="/">Analyze image</a>
+                <a href="/history.php">Analysis history</a>
+            </nav>
+        </header>
+        <main>
+            <section class="result-hero">
+                <div>
+                    <span class="eyebrow">Your workspace</span>
+                    <h1>Analysis <span class="accent-text">history.</span></h1>
+                    <p class="lead">Up to 50 reports saved to this browser session. Original image files are not stored.</p>
+                </div>
+                <a class="btn btn-secondary" href="/">+ New analysis</a>
+            </section>
 
-        <?php if ($errorMessage !== null): ?>
-            <p role="alert"><?= escapeHtml($errorMessage) ?></p>
-        <?php elseif ($analyses === []): ?>
-            <p>No analysis records have been saved yet.</p>
-        <?php else: ?>
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">ID</th>
-                        <th scope="col">Date (UTC/server time)</th>
-                        <th scope="col">Image details</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Result</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($analyses as $analysis): ?>
-                        <tr>
-                            <td><?= (int) $analysis['id'] ?></td>
-                            <td><?= escapeHtml((string) $analysis['created_at']) ?></td>
-                            <td>
-                                <?= escapeHtml((string) $analysis['image_mime']) ?>,
-                                <?= (int) $analysis['image_width'] ?> × <?= (int) $analysis['image_height'] ?>,
-                                <?= escapeHtml(formatBytes((int) $analysis['file_size_bytes'])) ?>
-                            </td>
-                            <td><?= escapeHtml((string) $analysis['detection_status']) ?></td>
-                            <td>
-                                <?php if ($analysis['detection_label'] !== null): ?>
-                                    <?= escapeHtml((string) $analysis['detection_label']) ?>
-                                <?php else: ?>
-                                    Not available
-                                <?php endif; ?>
-                                <?php if ($analysis['confidence'] !== null): ?>
-                                    (<?= escapeHtml((string) $analysis['confidence']) ?>)
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </main>
+            <?php if ($errorMessage !== null): ?>
+                <div class="error-box" role="alert"><?= escapeHtml($errorMessage) ?></div>
+            <?php elseif ($analyses === []): ?>
+                <section class="panel">
+                    <span class="upload-icon" aria-hidden="true">↗</span>
+                    <h2 style="margin-top:18px">No scans yet</h2>
+                    <p class="subtle">Your image analysis reports will appear here after you run a scan.</p>
+                    <a class="btn" href="/" style="max-width:260px">Analyze your first image</a>
+                </section>
+            <?php else: ?>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Report</th>
+                                <th scope="col">Date (server time)</th>
+                                <th scope="col">Image</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Assessment</th>
+                                <th scope="col">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($analyses as $analysis): ?>
+                                <tr>
+                                    <td>#<?= (int) $analysis['id'] ?></td>
+                                    <td><?= escapeHtml((string) $analysis['created_at']) ?></td>
+                                    <td>
+                                        <?= escapeHtml((string) $analysis['image_mime']) ?><br>
+                                        <span class="subtle"><?= (int) $analysis['image_width'] ?> × <?= (int) $analysis['image_height'] ?> · <?= escapeHtml(formatBytes((int) $analysis['file_size_bytes'])) ?></span>
+                                    </td>
+                                    <td><?= escapeHtml((string) $analysis['detection_status']) ?></td>
+                                    <td>
+                                        <?php if (($analysis['detection_label'] ?? null) === 'likely_ai_generated'): ?>
+                                            Likely AI-generated
+                                        <?php elseif (($analysis['detection_label'] ?? null) === 'likely_real'): ?>
+                                            Likely real image
+                                        <?php elseif (($analysis['detection_label'] ?? null) !== null): ?>
+                                            <?= escapeHtml((string) $analysis['detection_label']) ?>
+                                        <?php else: ?>
+                                            <span class="subtle">No classification</span>
+                                        <?php endif; ?>
+                                        <?php if (is_numeric($analysis['confidence'] ?? null)): ?>
+                                            <br><span class="subtle">Score <?= number_format((float) $analysis['confidence'] * 100, 1) ?>%</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><a href="/result.php?id=<?= (int) $analysis['id'] ?>">Open report →</a></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </main>
+        <footer class="site-footer">
+            <div class="footer-inner">
+                <span>AI Image Detector · Session-scoped history</span>
+                <span><a href="/">Back to analysis</a></span>
+            </div>
+        </footer>
+    </div>
 </body>
 </html>
