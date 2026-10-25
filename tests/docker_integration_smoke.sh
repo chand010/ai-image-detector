@@ -74,6 +74,32 @@ for _ in $(seq 1 60); do
 done
 [[ "$db_ready" == 1 ]] || fail "Application database account/schema did not become ready within 120 seconds"
 
+# Simulate an older persistent volume whose ENUM does not allow unavailable
+# or inconclusive results. A container restart must migrate it before uploads.
+docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root -e \
+    "ALTER TABLE ai_image_detector.analyses MODIFY COLUMN detection_status ENUM('not_configured','completed','failed') NOT NULL DEFAULT 'not_configured';"
+docker restart "$CONTAINER_NAME" >/dev/null
+
+db_ready=0
+for _ in $(seq 1 60); do
+    if docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
+        mysql --protocol=tcp --host=127.0.0.1 --user=ai_image_app \
+        --batch --skip-column-names \
+        -e "SELECT 1 FROM ai_image_detector.analyses LIMIT 0;" >/dev/null 2>&1; then
+        db_ready=1
+        break
+    fi
+    sleep 2
+done
+[[ "$db_ready" == 1 ]] || fail "Database did not recover after migration restart"
+
+STATUS_ENUM="$(docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root --batch --skip-column-names -e \
+    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='ai_image_detector' AND TABLE_NAME='analyses' AND COLUMN_NAME='detection_status'")"
+[[ "$STATUS_ENUM" == *"'unavailable'"* && "$STATUS_ENUM" == *"'inconclusive'"* ]] || fail "Startup did not migrate detection_status enum"
+echo "PASS: startup migrated legacy detection-status enum"
+
+# Re-fetch the CSRF token after restart because PHP sessions may have been reset.
+curl --silent --show-error --max-time 15 -c "$COOKIE_JAR" "$BASE_URL/" -o "$BODY" || fail "Could not reload upload page after database migration"
 grep -q 'name="csrf_token"' "$BODY" || fail "Upload page is missing the CSRF token field"
 echo "PASS: Docker container serves upload form"
 echo "PASS: MySQL schema is ready for the restricted application account"
