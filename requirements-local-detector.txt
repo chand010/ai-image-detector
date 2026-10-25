@@ -1,0 +1,5 @@
+# PyTorch CPU wheels are installed from the official CPU index in Dockerfile.
+# Keep the helper's Python stack separate from the raw-PHP web application.
+sentence-transformers[image]>=5.0,<6.0
+huggingface_hub>=0.30,<2.0
+Pillow>=10.0,<13.0
