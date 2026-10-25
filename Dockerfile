@@ -33,10 +33,12 @@ COPY requirements-local-detector.txt /tmp/requirements-local-detector.txt
 # official CPU-only PyTorch wheels: CUDA is optional and not required.
 RUN python3 -m venv /opt/ai-detector-venv \
     && /opt/ai-detector-venv/bin/pip install --no-cache-dir \
+        --timeout 300 --retries 10 \
         --index-url https://download.pytorch.org/whl/cpu \
         --extra-index-url https://pypi.org/simple \
         torch==2.7.1+cpu torchvision==0.22.1+cpu \
     && /opt/ai-detector-venv/bin/pip install --no-cache-dir \
+        --timeout 300 --retries 10 \
         -r /tmp/requirements-local-detector.txt \
     && rm -f /tmp/requirements-local-detector.txt
 
