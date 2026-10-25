@@ -7,7 +7,7 @@ require_once __DIR__ . '/OpenAIProvenanceResponseMapper.php';
 /**
  * Optional adapter for OpenAI Content Provenance checks.
  *
- * It is not wired into the upload handler. It sends an image externally only
+ * It is invoked by the upload handler only after per-upload consent. It sends an image externally only
  * when explicitly invoked and ENABLE_EXTERNAL_PROVENANCE is exactly "true".
  */
 final class OpenAIProvenanceProvider implements DetectionProviderInterface
