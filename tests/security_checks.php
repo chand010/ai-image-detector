@@ -158,7 +158,7 @@ checkSource(
         '/assets/app.css',
         '/assets/app.js',
         'external_processing_consent',
-        'temporary and deleted after analysis',
+        'deleted after analysis',
         'data-image-preview',
     ]
 );
