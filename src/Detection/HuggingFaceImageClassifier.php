@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 final class HuggingFaceImageClassifier
 {
-    private const DEFAULT_MODEL = 'umm-maybe/AI-image-detector';
+    private const DEFAULT_MODEL = 'Ateeqq/ai-vs-human-image-detector';
     private const MAX_RESPONSE_BYTES = 262144;
 
     /**
@@ -130,9 +130,9 @@ final class HuggingFaceImageClassifier
                     continue;
                 }
 
-                if (preg_match('/(artificial|ai.?generated|generated|synthetic|fake)/', $label) === 1) {
+                if ($label === 'ai' || preg_match('/(artificial|ai.?generated|generated|synthetic|fake)/', $label) === 1) {
                     $aiScore = max($aiScore ?? 0.0, $score);
-                } elseif (preg_match('/(human|real|authentic|natural|not.?ai|non.?ai)/', $label) === 1) {
+                } elseif ($label === 'hum' || preg_match('/(human|real|authentic|natural|not.?ai|non.?ai)/', $label) === 1) {
                     $realScore = max($realScore ?? 0.0, $score);
                 }
             }
