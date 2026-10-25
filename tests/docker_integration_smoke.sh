@@ -81,8 +81,13 @@ docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root -e \
 docker restart "$CONTAINER_NAME" >/dev/null
 
 db_ready=0
+STATUS_ENUM=""
 for _ in $(seq 1 60); do
-    if docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
+    # MySQL may accept connections before the one-shot migration finishes.
+    STATUS_ENUM="$(docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root --batch --skip-column-names -e \
+        "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='ai_image_detector' AND TABLE_NAME='analyses' AND COLUMN_NAME='detection_status'" 2>/dev/null || true)"
+    if [[ "$STATUS_ENUM" == *"'unavailable'"* && "$STATUS_ENUM" == *"'inconclusive'"* ]] && \
+       docker exec -e "MYSQL_PWD=$DB_PASSWORD" "$CONTAINER_NAME" \
         mysql --protocol=tcp --host=127.0.0.1 --user=ai_image_app \
         --batch --skip-column-names \
         -e "SELECT 1 FROM ai_image_detector.analyses LIMIT 0;" >/dev/null 2>&1; then
@@ -91,10 +96,7 @@ for _ in $(seq 1 60); do
     fi
     sleep 2
 done
-[[ "$db_ready" == 1 ]] || fail "Database did not recover after migration restart"
-
-STATUS_ENUM="$(docker exec "$CONTAINER_NAME" mysql --protocol=socket --user=root --batch --skip-column-names -e \
-    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='ai_image_detector' AND TABLE_NAME='analyses' AND COLUMN_NAME='detection_status'")"
+[[ "$db_ready" == 1 ]] || fail "Database did not recover with migrated detection-status enum"
 [[ "$STATUS_ENUM" == *"'unavailable'"* && "$STATUS_ENUM" == *"'inconclusive'"* ]] || fail "Startup did not migrate detection_status enum"
 echo "PASS: startup migrated legacy detection-status enum"
 
