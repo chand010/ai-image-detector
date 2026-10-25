@@ -29,11 +29,11 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < <(find . -type f -name '*.php' -not -path './.git/*')
-          if [ "\${#files[@]}" -eq 0 ]; then
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "No PHP files found."
             exit 1
           fi
-          for file in "\${files[@]}"; do
+          for file in "${files[@]}"; do
             echo "Checking $file"
             php -l "$file"
           done
