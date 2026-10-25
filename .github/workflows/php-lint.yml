@@ -1,4 +1,4 @@
-name: PHP Tests
+name: PHP and local detector tests
 
 on:
   push:
@@ -20,16 +20,20 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Lint PHP files
         shell: bash
         run: |
           set -euo pipefail
           mapfile -t files < <(find . -type f -name '*.php' -not -path './.git/*')
-          if [ "${#files[@]}" -eq 0 ]; then
+          if [ "\${#files[@]}" -eq 0 ]; then
             echo "No PHP files found."
             exit 1
           fi
-          for file in "${files[@]}"; do
+          for file in "\${files[@]}"; do
             echo "Checking $file"
             php -l "$file"
           done
@@ -41,6 +45,10 @@ jobs:
             echo "Checking $file"
             bash -n "$file"
           done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+      - name: Compile Python helper and run score-mapping tests
+        run: |
+          python -m py_compile scripts/smaug_detect.py tests/test_smaug_detector.py
+          python -m unittest tests/test_smaug_detector.py
       - name: Run source-level security checks
         run: php tests/security_checks.php
       - name: Run offline provenance response mapper tests
