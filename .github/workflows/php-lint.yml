@@ -47,6 +47,8 @@ jobs:
         run: php tests/provenance_response_mapper.php
       - name: Run disabled external provider test
         run: php tests/provenance_provider_disabled.php
+      - name: Run disabled classifier test
+        run: php tests/classifier_provider_disabled.php
       - name: Run HTTP security smoke tests
         run: bash tests/http_security_smoke.sh
       - name: Run Docker and MySQL integration smoke test
