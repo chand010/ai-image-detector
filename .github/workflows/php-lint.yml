@@ -48,7 +48,7 @@ jobs:
       - name: Compile Python helper and run score-mapping tests
         run: |
           python -m py_compile scripts/smaug_detect.py tests/test_smaug_detector.py
-          python -m unittest tests/test_smaug_detector.py
+          python tests/test_smaug_detector.py
       - name: Run source-level security checks
         run: php tests/security_checks.php
       - name: Run offline provenance response mapper tests
