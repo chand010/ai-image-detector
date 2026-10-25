@@ -67,7 +67,7 @@ def load_detector() -> Any:
     from huggingface_hub import snapshot_download
 
     cache_dir = os.environ.get("HF_HOME", "/var/cache/huggingface")
-    revision = os.environ.get("SMAUG_MODEL_REVISION", "").strip() or None
+    revision = os.environ.get("SMAUG_MODEL_REVISION", "").strip() or "c7c95951e04a87b884a4ad479401b1128c3903bd"
     model_path = snapshot_download(
         repo_id=MODEL_ID,
         revision=revision,
