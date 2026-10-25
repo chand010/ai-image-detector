@@ -1,5 +1,7 @@
+# Keep the custom Smaug helper on a Transformers 4.x stack until its
+# upstream code is explicitly tested with Transformers 5.x and Hub 1.x.
 # PyTorch CPU wheels are installed from the official CPU index in Dockerfile.
-# Keep the helper's Python stack separate from the raw-PHP web application.
-sentence-transformers[image]>=5.0,<6.0
-huggingface_hub>=0.30,<2.0
+sentence-transformers[image]==5.1.2
+transformers==4.57.3
+huggingface_hub==0.36.0
 Pillow>=10.0,<13.0
