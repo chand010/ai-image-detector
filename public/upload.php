@@ -21,7 +21,7 @@ function respond(int $status, string $message): never
     http_response_code($status);
     header('Content-Type: text/html; charset=UTF-8');
     $safeMessage = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Upload result</title><body><main><h1>Upload result</h1><p>' . $safeMessage . '</p><p><a href="/">Back</a></p></main></body></html>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Upload result — AI Image Detector</title><link rel="stylesheet" href="/assets/app.css"></head><body><div class="site-shell"><header class="site-header"><a class="brand" href="/"><span class="brand-mark">AI</span><span>IMAGE INTELLIGENCE</span></a></header><main><section class="result-hero"><div><span class="eyebrow">Upload notice</span><h1>We could not <span class="accent-text">continue.</span></h1></div></section><div class="error-box" role="alert">' . $safeMessage . '</div><p style="margin-top:24px"><a class="btn btn-secondary" href="/" style="max-width:220px">Back to upload</a></p></main></div></body></html>';
     exit;
 }
 
