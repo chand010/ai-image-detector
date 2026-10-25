@@ -122,6 +122,15 @@ checkSource(
 );
 
 checkSource(
+    'Container restart reliability',
+    'docker/entrypoint.sh',
+    [
+        'rm -f /var/run/apache2/apache2.pid',
+        'exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf',
+    ]
+);
+
+checkSource(
     'Database connection protections',
     'config/database.php',
     [
@@ -159,6 +168,7 @@ checkSource(
         'abacusai/Smaug-AI-Image-Detector',
         'snapshot_download(',
         'normalize_score(',
+        'raw_score = detector(str(image_path))',
         'model_score_out_of_range',
         'local_model_load_or_inference_failed',
     ],
