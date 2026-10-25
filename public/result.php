@@ -33,7 +33,7 @@ if ($id === false || $id === null) {
             $statement = $pdo->prepare(
                 'SELECT id, image_mime, image_width, image_height, file_size_bytes,
                         detection_status, detection_label, confidence, detection_provider,
-                        detection_signals_json, external_processing_consent, created_at
+                        detection_error_code, detection_signals_json, external_processing_consent, created_at
                  FROM analyses
                  WHERE id = :id AND owner_token_hash = :owner_hash
                  LIMIT 1'
@@ -86,8 +86,12 @@ $statusText = match ($status) {
     'inconclusive' => 'Inconclusive',
     'unavailable' => 'Engine unavailable',
     'failed' => 'Analysis failed',
-    default => 'Validation only',
+    'not_configured' => 'Detector not run',
+    default => 'Unknown detection status',
 };
+$errorCode = is_array($analysis) && is_string($analysis['detection_error_code'] ?? null) &&
+    preg_match('/^[a-z0-9_]{1,64}$/', $analysis['detection_error_code']) === 1
+        ? $analysis['detection_error_code'] : null;
 $humanLabel = match ($label) {
     'likely_ai_generated' => 'Likely AI-generated',
     'likely_real' => 'Likely real image',
@@ -153,8 +157,13 @@ $humanLabel = match ($label) {
                             <p class="subtle">The response did not provide a recognized class. No AI-origin conclusion can be drawn.</p>
                         <?php elseif ($status === 'failed'): ?>
                             <p class="subtle">The analysis could not be completed. Please try again with another supported image.</p>
+                        <?php elseif ($status === 'not_configured'): ?>
+                            <p class="subtle">The image was validated, but the saved record says the detector was not run. This can indicate an older application version or a legacy record.</p>
                         <?php else: ?>
-                            <p class="subtle">The image passed validation, but no classifier result is available for this scan.</p>
+                            <p class="subtle">The saved detection status is not recognized. No AI-origin conclusion can be drawn.</p>
+                        <?php endif; ?>
+                        <?php if ($errorCode !== null && $status !== 'completed'): ?>
+                            <p class="subtle">Diagnostic code: <code><?= resultEscape($errorCode) ?></code>. Share this code with the application operator; it contains no image data or credentials.</p>
                         <?php endif; ?>
                         <div class="notice" style="margin-top:20px">An AI detector can make false positives and false negatives. Do not use this estimate as forensic proof or as the sole basis for a high-stakes decision.</div>
                     </section>
