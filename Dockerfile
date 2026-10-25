@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TOKENIZERS_PARALLELISM=false \
     ENABLE_LOCAL_CLASSIFIER=true \
     SMAUG_MODEL_ID=abacusai/Smaug-AI-Image-Detector \
+    SMAUG_MODEL_REVISION=c7c95951e04a87b884a4ad479401b1128c3903bd \
     SMAUG_NUM_THREADS=4
 
 RUN apt-get update \
