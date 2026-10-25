@@ -88,6 +88,9 @@ checkSource(
         'htmlspecialchars(',
         'did not intentionally retain the original image',
         'external_processing_consent',
+        'detection_error_code',
+        'Detector not run',
+        'Diagnostic code:',
         'No provenance or classifier signals were returned for this scan.',
     ]
 );
@@ -98,6 +101,7 @@ checkSource(
     [
         'owner_token_hash CHAR(64) NULL',
         'detection_signals_json JSON NULL',
+        'detection_error_code VARCHAR(64) NULL',
         'external_processing_consent TINYINT(1) NOT NULL DEFAULT 0',
         "'inconclusive'",
         "'unavailable'",
@@ -110,6 +114,7 @@ checkSource(
     'docker/init-database.sh',
     [
         'ensure_column detection_signals_json "JSON NULL"',
+        'ensure_column detection_error_code "VARCHAR(64) NULL"',
         'ensure_column external_processing_consent "TINYINT(1) NOT NULL DEFAULT 0"',
         "'not_configured','completed','inconclusive','unavailable','failed'",
         'GRANT SELECT, INSERT, UPDATE ON $DB_NAME.*',
