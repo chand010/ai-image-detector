@@ -21,7 +21,7 @@ A security-focused raw-PHP web application that validates uploaded images, runs 
 
 The primary classifier is [abacusai/Smaug-AI-Image-Detector](https://huggingface.co/abacusai/Smaug-AI-Image-Detector). The model card documents local CPU use and a score between 0 and 1 representing the model's estimate that an image is AI-generated. The model is not currently served by Hugging Face Inference Providers, so this project loads it locally through the documented SmaugImageDetect helper.
 
-The first analysis downloads model artifacts from Hugging Face into /var/cache/huggingface; this can take time and requires outbound network access on first use. The cache contains model files only, not uploaded images. Mount ai-image-detector-model-cache to preserve the cache when replacing the container. Later requests still load model weights for inference and may take time on CPU.
+The first analysis downloads model artifacts from Hugging Face into /var/cache/huggingface; this can take time and requires outbound network access on first use. The cache contains model files only, not uploaded images. Mount ai-image-detector-model-cache to preserve the cache when replacing the container. Later requests still load model weights for inference and may take time on CPU. The Python helper calls the model using its documented single-image path API. Its Sentence Transformers, Transformers 4.x, and Hugging Face Hub dependencies are pinned to a compatible baseline; upgrade them only after running a real inference test.
 
 Result interpretation:
 - **Likely AI-generated:** the model score is at least 0.5.
