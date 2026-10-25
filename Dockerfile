@@ -26,6 +26,8 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+COPY requirements-local-detector.txt /tmp/requirements-local-detector.txt
+
 # Keep the detector in an isolated Python virtual environment. Install the
 # official CPU-only PyTorch wheels: CUDA is optional and not required.
 RUN python3 -m venv /opt/ai-detector-venv \
@@ -34,9 +36,10 @@ RUN python3 -m venv /opt/ai-detector-venv \
         --extra-index-url https://pypi.org/simple \
         torch==2.7.1+cpu torchvision==0.22.1+cpu \
     && /opt/ai-detector-venv/bin/pip install --no-cache-dir \
-        -r /var/www/html/requirements-local-detector.txt
+        -r /tmp/requirements-local-detector.txt \
+    && rm -f /tmp/requirements-local-detector.txt
 
-RUN printf '%s\\n' \
+RUN printf '%s\n' \
     'file_uploads=On' \
     'upload_max_filesize=6M' \
     'post_max_size=7M' \
@@ -58,7 +61,9 @@ RUN mkdir -p /var/log/supervisor /var/run/mysqld /var/cache/huggingface \
     && chown -R www-data:www-data /var/www/html /var/cache/huggingface \
     && chmod -R a=rX /var/www/html \
     && chmod 0755 /var/www/html/docker/entrypoint.sh \
-    && chmod 0755 /var/www/html/scripts/smaug_detect.py
+    && chmod 0755 /var/www/html/scripts/smaug_detect.py \
+    && printf 'ServerName localhost\n' > /etc/apache2/conf-available/servername.conf \
+    && a2enconf servername
 
 EXPOSE 80
 
