@@ -46,14 +46,14 @@ if (empty($_SESSION['csrf_token'])) {
         <section class="hero">
             <span class="eyebrow">Image analysis workspace</span>
             <h1>Look closer.<br><span class="accent-text">Question the image.</span></h1>
-            <p class="lead">Validate image files, inspect supported provenance signals, and — when a classifier is configured — get an experimental AI-origin estimate. No single signal is proof of authorship.</p>
+            <p class="lead">Run an experimental AI-origin detector locally on this server and optionally inspect supported provenance signals. A model score is evidence, not proof of authorship.</p>
         </section>
 
         <main class="content-grid">
             <section class="panel" aria-labelledby="upload-heading">
-                <span class="status-pill">Privacy-first workflow</span>
+                <span class="status-pill">Local-first workflow</span>
                 <h2 id="upload-heading" style="margin-top:20px">Analyze an image</h2>
-                <p class="subtle">Choose a JPEG, PNG, or WebP file up to 5 MB. The original upload is processed temporarily and deleted after analysis.</p>
+                <p class="subtle">Choose a JPEG, PNG, or WebP file up to 5 MB. Smaug runs locally; the original upload is processed temporarily and deleted after analysis.</p>
 
                 <form action="/upload.php" method="post" enctype="multipart/form-data" data-upload-form>
                     <input type="hidden" name="csrf_token"
@@ -76,17 +76,17 @@ if (empty($_SESSION['csrf_token'])) {
                         <input id="external_processing_consent" name="external_processing_consent"
                                type="checkbox" value="yes">
                         <label for="external_processing_consent">
-                            <strong>Allow external analysis for this upload</strong><br>
-                            I agree that this image may be sent to a configured external AI classifier and/or OpenAI provenance service. This only happens when the corresponding server-side feature is enabled. Leave unchecked for local validation only.
+                            <strong>Allow an optional external provenance check</strong><br>
+                            If enabled by the server, this sends the image to the configured OpenAI Content Provenance service. The local Smaug classifier runs without this permission. Leave unchecked to keep the image on this server.
                         </label>
                     </div>
 
                     <button class="btn" type="submit" data-submit-button>
                         <span class="spinner" aria-hidden="true"></span>
-                        <span data-button-label>Validate and analyze image</span>
+                        <span data-button-label>Analyze image locally</span>
                         <span aria-hidden="true">↗</span>
                     </button>
-                    <p class="privacy-note"><span aria-hidden="true">◆</span><span>Images are not stored as permanent files or in the database. Metadata and normalized analysis results may be saved to your browser-session history.</span></p>
+                    <p class="privacy-note"><span aria-hidden="true">◆</span><span>The original image is not stored as a permanent file or in the database. Only metadata and normalized analysis results are saved to your browser-session history. The first scan may take longer while the model downloads.</span></p>
                 </form>
             </section>
 
@@ -98,13 +98,13 @@ if (empty($_SESSION['csrf_token'])) {
                 </div>
                 <div class="mini-card">
                     <span class="eyebrow">02 / Assess</span>
-                    <h3 style="margin-top:12px">Look for evidence</h3>
-                    <p>Configured providers may return classifier scores or supported provenance signals. If unavailable, the app should say so clearly.</p>
+                    <h3 style="margin-top:12px">Run local inference</h3>
+                    <p>The Smaug model estimates whether an image is AI-generated. It runs on this server and does not need a hosted-classifier API token.</p>
                 </div>
                 <div class="mini-card">
                     <span class="eyebrow">03 / Interpret</span>
                     <h3 style="margin-top:12px">Treat results carefully</h3>
-                    <p>AI-image detectors can make mistakes. “Likely real” does not prove human authorship, and a missing watermark proves nothing by itself.</p>
+                    <p>Detectors can make mistakes. “Likely real” does not prove human authorship, and a missing watermark proves nothing by itself.</p>
                 </div>
             </aside>
         </main>
@@ -112,7 +112,7 @@ if (empty($_SESSION['csrf_token'])) {
         <footer class="site-footer">
             <div class="footer-inner">
                 <span>AI Image Detector · Learning and research prototype</span>
-                <span>Raw PHP · Temporary image processing</span>
+                <span>Raw PHP · Local inference · Temporary image processing</span>
             </div>
         </footer>
     </div>
