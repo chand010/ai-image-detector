@@ -180,10 +180,10 @@ try {
         'INSERT INTO analyses
             (owner_token_hash, image_mime, image_width, image_height, file_size_bytes,
              detection_status, detection_label, confidence, detection_provider,
-             detection_signals_json, external_processing_consent)
+             detection_error_code, detection_signals_json, external_processing_consent)
          VALUES
             (:owner_hash, :mime, :width, :height, :file_size,
-             :status, :label, :confidence, :provider, :signals, :consent)'
+             :status, :label, :confidence, :provider, :error_code, :signals, :consent)'
     );
     $statement->execute([
         'owner_hash' => hash('sha256', $_SESSION['analysis_owner_token']),
@@ -199,6 +199,9 @@ try {
             ? max(0.0, min(1.0, (float) $detection['confidence']))
             : null,
         'provider' => is_string($detection['provider'] ?? null) ? $detection['provider'] : null,
+        'error_code' => is_string($detection['error_code'] ?? null) &&
+            preg_match('/^[a-z0-9_]{1,64}$/', $detection['error_code']) === 1
+                ? $detection['error_code'] : null,
         'signals' => $signalsJson,
         'consent' => $consentGiven ? 1 : 0,
     ]);
