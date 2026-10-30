@@ -30,6 +30,27 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respond(405, 'Use the upload form to submit an image.');
 }
 
+// Apply a shared per-IP upload limit before accepting the request body.
+// REMOTE_ADDR is used deliberately; arbitrary X-Forwarded-For values are untrusted.
+require_once __DIR__ . '/../src/Security/RateLimiter.php';
+try {
+    $callerAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $retryAfter = RateLimiter::consume(
+        is_string($callerAddress) ? $callerAddress : 'unknown',
+        sys_get_temp_dir() . '/ai-image-detector-rate-limits',
+        5,
+        600
+    );
+} catch (Throwable $error) {
+    error_log('AI Image Detector: upload rate limiter unavailable.');
+    respond(503, 'Uploads are temporarily unavailable. Please try again later.');
+}
+
+if ($retryAfter !== null) {
+    header('Retry-After: ' . $retryAfter);
+    respond(429, 'Too many upload attempts. Please wait before trying again.');
+}
+
 $submittedToken = $_POST['csrf_token'] ?? '';
 $sessionToken = $_SESSION['csrf_token'] ?? '';
 if (!is_string($submittedToken) || !is_string($sessionToken) ||
