@@ -30,6 +30,27 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respond(405, 'Use the upload form to submit an image.');
 }
 
+// Apply a shared per-IP upload limit before accepting the request body.
+// REMOTE_ADDR is used deliberately; arbitrary X-Forwarded-For values are untrusted.
+require_once __DIR__ . '/../src/Security/RateLimiter.php';
+try {
+    $callerAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $retryAfter = RateLimiter::consume(
+        is_string($callerAddress) ? $callerAddress : 'unknown',
+        sys_get_temp_dir() . '/ai-image-detector-rate-limits',
+        5,
+        600
+    );
+} catch (Throwable $error) {
+    error_log('AI Image Detector: upload rate limiter unavailable.');
+    respond(503, 'Uploads are temporarily unavailable. Please try again later.');
+}
+
+if ($retryAfter !== null) {
+    header('Retry-After: ' . $retryAfter);
+    respond(429, 'Too many upload attempts. Please wait before trying again.');
+}
+
 $submittedToken = $_POST['csrf_token'] ?? '';
 $sessionToken = $_SESSION['csrf_token'] ?? '';
 if (!is_string($submittedToken) || !is_string($sessionToken) ||
@@ -100,13 +121,51 @@ if ($decoded === false) {
 }
 imagedestroy($decoded);
 
-// Save only validated metadata. The uploaded image itself is never stored.
+// The provider is called only after validation and explicit per-upload consent.
+// The provider itself also requires ENABLE_EXTERNAL_PROVENANCE=true.
+$consentGiven = ($_POST['external_processing_consent'] ?? null) === 'yes';
+$detection = [
+    'provider' => null,
+    'status' => 'not_configured',
+    'signals' => [],
+    'error_code' => null,
+];
+
+try {
+    if ($consentGiven) {
+        require_once __DIR__ . '/../src/Detection/OpenAIProvenanceProvider.php';
+        $provider = new OpenAIProvenanceProvider();
+        $detection = $provider->analyze($file['tmp_name'], $mime);
+    }
+} catch (Throwable $error) {
+    // Keep provider failures generic; never expose response bodies or secrets.
+    error_log('AI Image Detector: provenance provider failed unexpectedly.');
+    $detection = [
+        'provider' => 'openai_content_provenance',
+        'status' => 'unavailable',
+        'signals' => [],
+        'error_code' => 'provider_internal_error',
+    ];
+} finally {
+    // Explicitly remove the PHP upload temporary file after validation/analysis.
+    // PHP normally cleans it at request shutdown as well; this shortens its lifetime.
+    if (is_uploaded_file($file['tmp_name']) && !@unlink($file['tmp_name'])) {
+        error_log('AI Image Detector: temporary upload cleanup failed.');
+    }
+}
+
+$signalsJson = json_encode($detection['signals'], JSON_THROW_ON_ERROR);
+
 try {
     require_once __DIR__ . '/../config/database.php';
     $pdo = createDatabaseConnection();
     $statement = $pdo->prepare(
-        'INSERT INTO analyses (owner_token_hash, image_mime, image_width, image_height, file_size_bytes, detection_status)
-         VALUES (:owner_hash, :mime, :width, :height, :file_size, :status)'
+        'INSERT INTO analyses
+            (owner_token_hash, image_mime, image_width, image_height, file_size_bytes,
+             detection_status, detection_provider, detection_signals_json, external_processing_consent)
+         VALUES
+            (:owner_hash, :mime, :width, :height, :file_size,
+             :status, :provider, :signals, :consent)'
     );
     $statement->execute([
         'owner_hash' => hash('sha256', $_SESSION['analysis_owner_token']),
@@ -114,7 +173,10 @@ try {
         'width' => $width,
         'height' => $height,
         'file_size' => $file['size'],
-        'status' => 'not_configured',
+        'status' => $detection['status'],
+        'provider' => $detection['provider'],
+        'signals' => $signalsJson,
+        'consent' => $consentGiven ? 1 : 0,
     ]);
     $analysisId = (int) $pdo->lastInsertId();
 } catch (Throwable $exception) {

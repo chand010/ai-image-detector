@@ -14,7 +14,14 @@ RUN apt-get update \
         php-mysql \
         supervisor \
         ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && a2enmod headers \
+    && printf '%s\n' \
+        'ServerTokens Prod' \
+        'ServerSignature Off' \
+        'TraceEnable Off' \
+        > /etc/apache2/conf-available/ai-image-detector-security.conf \
+    && a2enconf ai-image-detector-security
 
 RUN printf '%s\n' \
     'file_uploads=On' \
@@ -23,6 +30,12 @@ RUN printf '%s\n' \
     'max_file_uploads=1' \
     'memory_limit=256M' \
     'max_execution_time=30' \
+    'expose_php=Off' \
+    'display_errors=Off' \
+    'log_errors=On' \
+    'session.use_strict_mode=1' \
+    'session.cookie_httponly=1' \
+    'session.cookie_samesite=Lax' \
     > /etc/php/8.3/apache2/conf.d/99-ai-image-detector.ini
 
 WORKDIR /var/www/html
